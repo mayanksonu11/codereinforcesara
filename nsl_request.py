@@ -2,9 +2,9 @@ import numpy
 import random
 import copy
 
-cpu_embb = (5,5) #cpu units range for eMBB
-cpu_urllc = (5,5) 
-cpu_miot = (5,5) 
+cpu_embb = (4,5) #cpu units range for eMBB
+cpu_urllc = (3.5,4) 
+cpu_miot = (4,4.5) 
 # bw_embb = (1,1) #Mbps
 # bw_urllc = (.50,.50) #Mbps
 # bw_miot = (.1,.3)
@@ -122,7 +122,7 @@ def add_resources(nsl_graph,service_type):
         bw = bw_miot
 
     for v in nsl_graph["vnfs"]:
-        v["cpu"] = random.randint(cpu[0],cpu[1])
+        v["cpu"] = random.uniform(cpu[0],cpu[1])
         # v["str"] = random.randint(strg[0],strg[1])
     for l in nsl_graph["vlinks"]:
         # l["bw"] = random.randint(bw[0],bw[1])

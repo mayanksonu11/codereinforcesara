@@ -38,9 +38,9 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     centralized_vnfs = []
     # local_vnfs = []
     edge_vnfs = [] 
-    delay=0    
-    current_delay=0
-    delta_delay=0 
+    delay = 0    
+    current_delay = 0
+    delta_delay = 0 
     vnfs = nslr.nsl_graph["vnfs"] #considerar rankear vnfs tambien
     reduce_nslr_graph(nslr) #builds a reduced version of the nsl_graph
     vnodes = nslr.nsl_graph_reduced["vnodes"]    
@@ -54,7 +54,9 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     ################### vnfs admission #################
     rejected = False
     already = [] #list of nodes that already hold a vnode
+    already_vnf = dict()
     do_nothing = 0
+    total_cpu = 0
     for v in vnodes:
         if rejected:
             break
@@ -71,43 +73,50 @@ def nsl_placement(nslr, substrate, node_to_nslr):
 
             delta_delay = delay_node(percent_utilization) - current_delay
 
-
-             
-
-
             # check if the addition of this delta delay affects other existing users on the node
             try:
-                for curr_nslr in node_to_nslr[n["id"]]:
-                    # print("curr_nslr id:",curr_nslr.id, "current delay:", curr_nslr.current_delay) 
-                    if(curr_nslr.current_delay + delta_delay > curr_nslr.delay_budget):
-                        # print("Updated delay:", curr_nslr.current_delay + delta_delay, "Delay budget:", curr_nslr.delay_budget)   
+                for _nslr in node_to_nslr[n["id"]]:
+                    # print("_nslr id:",_nslr.id, "current delay:", _nslr.current_delay) 
+                    if(_nslr.current_delay + delta_delay > _nslr.delay_budget):
+                        print("Delay violation of existing users due to percent_util:",percent_utilization, " demand:",v["cpu"])
+                        # print("Updated delay:", _nslr.current_delay + delta_delay, "Delay budget:", _nslr.delay_budget)   
                         rejected = True
                         break
                 if rejected:
                     break
             except:
-                do_nothing += 1
-           
+                None
            
             # update the delay of all the users on the current node in case of successful admission of user
             try:
-                for curr_nslr in node_to_nslr[n["id"]]:
-                    curr_nslr.current_delay += delta_delay
+                for _nslr in node_to_nslr[n["id"]]:
+                    _nslr.current_delay += delta_delay
             except:
-                do_nothing += 1
+                None
            
             # if all vnf cannot be successfully placed then revert the delay of all the users to initial value
-            delay = delay + delay_node(percent_utilization) 
-            #print ("delay:", delay, "delay_budget:", nslr.delay_budget)  
-            if delay <= nslr.delay_budget and v["cpu"] <= n["cpu"] and v["type"] == n["type"] and n["id"] not in already: 
+            _delay = delay
+            if v["function"] not in already_vnf:
+                _delay = _delay + delay_node(percent_utilization) 
+            else:
+                if already_vnf[v["function"]] > delay_node(percent_utilization):
+                    _delay = _delay - already_vnf[v["function"]] + delay_node(percent_utilization)
+
+            # print ("delay:", delay, "delay_budget:", nslr.delay_budget)  
+            if _delay <= nslr.delay_budget and v["cpu"] <= n["cpu"] and v["type"] == n["type"] and n["id"] not in already: #
                 #mapping:
                 #mapping of user ids to the nodes that they are connected using nodes id are the index
-                
+                total_cpu += v["cpu"]
                 v["mapped_to"] = n["id"]
+                delay = _delay
+                if v["function"] not in already_vnf:
+                    already_vnf[v["function"]] = delay_node(percent_utilization)
+                else:
+                    already_vnf[v["function"]] = min(delay_node(percent_utilization), already_vnf[v["function"]])
+
                 already.append(n["id"])
                 break
-            else: # recurso insuficiente, vnode rejected
-                delay=delay - delay_node(percent_utilization)                 
+            else: # recurso insuficiente, vnode rejected               
                 if ranked_nodes_cpu.index(n) == len(ranked_nodes_cpu)-1: #slice rejection only when no node has enough resources
                     rejected = True    
                     break   
@@ -118,10 +127,10 @@ def nsl_placement(nslr, substrate, node_to_nslr):
         rejected = analyze_links(nsl_graph_red,substrate)
     
     if not rejected:
-        assert(delay>0)
-        nslr.current_delay=delay
+        assert(delay > 0)
+        nslr.current_delay = delay
+        print("Successfully accepted:",nslr.service_type," cpu:",total_cpu, " delay:", delay)
     else:
-        print("Reverting the updates in the user")
         node_to_nslr = copy_node_to_nslr
         assert(node_to_nslr == copy_node_to_nslr)
     # else:
@@ -130,7 +139,7 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     # if rejected:
     #     print("\n\n","***rejected by scarce link rsc","\n\n")
     #print("Mapping of node to nslr",node_to_nslr)
-    return rejected,delay 
+    return rejected, delay 
 
 def sort_nodes(node_list,sortby):       
     sorted_list = sorted(node_list, key=itemgetter(sortby), reverse=True)#sorted list    
@@ -156,7 +165,8 @@ def calculate_resource_potential(substrate,resource_type):
         
         local_rsc_capacity = nodes[i].get(resource_type) * bw_sum
         # nodes[i]["node_potential"] = (local_rsc_capacity/10000) + (nodes[i]["degree_centrality"]*5)
-        nodes[i]["node_potential"] = local_rsc_capacity #+ (nodes[i]["degree_centrality"]*5)
+        # nodes[i]["node_potential"] = local_rsc_capacity #+ (nodes[i]["degree_centrality"]*5)
+        nodes[i]["node_potential"] = nodes[i]["cpu"]
         #print("+++",local_rsc_capacity)
         #print("+++",nodes[i]["degree_centrality"])
 
@@ -179,7 +189,7 @@ def reduce_nslr_graph(nslr):
         else: 
             edge_vnfs.append(vnf) 
 
-    #2. Ordenar las vnfs por backup:
+    #2. Sort vnfs by backup:
     centralized_vnfs = sorted(centralized_vnfs, key=itemgetter("backup"))
     # local_vnfs = sorted(local_vnfs, key=itemgetter("backup"))
     edge_vnfs = sorted(edge_vnfs, key=itemgetter("backup"))
@@ -216,6 +226,7 @@ def group_vnfs(vnfs_list,node_type):
         # print(vnfs_list[i])
         if i==0:
             vnode["cpu"] = vnfs_list[i]["cpu"]
+            vnode["function"] = vnfs_list[i]["function"]
             vnode["vnfs"].append(vnfs_list[i]["id"])
             if i == len(vnfs_list)-1:
                 vnode["id"]=cont
@@ -235,6 +246,7 @@ def group_vnfs(vnfs_list,node_type):
             nsl_graph_red["vnodes"].append(vnode.copy())
             cont += 1
             vnode["cpu"] = vnfs_list[i]["cpu"]
+            vnode["function"] = vnfs_list[i]["function"]
             vnode["vnfs"] = []
             vnode["vnfs"].append(vnfs_list[i]["id"])
             if i == len(vnfs_list)-1:

@@ -131,7 +131,7 @@ class Agent(object):
 
         epsilon = max(0.01, 0.08 - 0.01*(self.steps/200)) #Linear annealing from 8% to 1%
         print_interval = 20
-        print(state)
+        print("Current State:",state)
 
         prob = self.q(torch.from_numpy(np.asarray(state)).float())
         self.m = Categorical(prob) 

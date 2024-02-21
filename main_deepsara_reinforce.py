@@ -11,14 +11,17 @@ import REINFORCE
 import ddpg
 #import telegram_bot as bot
 import time
-from plot_param import *
+from datetime import datetime
+import plot_param
+
+import dqn
 
 # import bisect
 #simulation parameters
 # seed = 0
-repetitions = 1 #33
+repetitions = 5 #33
 #RL-specific parameters
-episodes = 50 #240
+episodes = 20 #240
 twindow_length = 1
 # embb_arrival_rate = 10 #5#1#2 #reqXsecond
 # urllc_arrival_rate = 40 #5#2.5 #reqXsecond
@@ -27,7 +30,7 @@ twindow_length = 1
 embb_arrival_rate = 0
 urllc_arrival_rate = 0
 miot_arrival_rate = 0 
-arrival_rates = [20] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
+arrival_rates = [50] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
 
 mean_operation_time = 15
 
@@ -140,6 +143,7 @@ class Controlador:
         self.urllc_utl = 0
         self.miot_utl = 0
         self.total_voilations=0
+        self.penalty=0
 
         self.simulation = Sim()
         self.substrate = {}
@@ -393,7 +397,10 @@ def update_resources(substrate,nslr,kill):
                 
                 n["cpu"] = n["cpu"] + vnf["cpu"]
                 #print("Before size of array",len(node_to_nslr[n["id"]]))
-                node_to_nslr[n["id"]].discard(nslr)
+                try:
+                    node_to_nslr[n["id"]].discard(nslr)
+                except:
+                    None
                 #print("After size of array",len(node_to_nslr[n["id"]]))
                 substrate.graph[tipo] += vnf["cpu"]
             else:
@@ -447,6 +454,8 @@ def resource_allocation(cn): #cn=controller
     max_link_profit = substrate.graph["max_bw_profit"]*sim.run_till
     max_profit = max_link_profit + max_node_profit
     step_penalty=0.000
+    rejection_count = 0
+    rejection_penalty = 0
     voilations=0
     global node_to_nslr
 
@@ -457,22 +466,22 @@ def resource_allocation(cn): #cn=controller
         if not rejected: 
             req.current_delay = delay
             #instantiation y adicion de evento de termination
-            req.set_end_time(sim.horario+req.operation_time)
+            req.set_end_time(sim.horario + req.operation_time)
             graph = req.nsl_graph_reduced
             #delay=delay_req_utilisation(substrate.graph)
 
             update_resources(substrate,req,False)#instantiation, ocupar recursos
-            if delay==1000:
-                step_penalty=1000
-            elif req.service_type=="embb" and delay>10:
-                step_penalty+= (delay-0.1)
-                voilations+=1
-            elif req.service_type=="urllc" and delay>1:
-                step_penalty+= (delay-0.05)
-                voilations+=1
-            elif req.service_type=="miot" and delay>5:
-                step_penalty+= (delay-0.04)
-                voilations+=1
+            # if delay==1000:
+            #     step_penalty=1000
+            # elif req.service_type=="embb" and delay>10:
+            #     step_penalty+= (delay-10)
+            #     voilations+=1
+            # elif req.service_type=="urllc" and delay>1:
+            #     step_penalty+= (delay-1)
+            #     voilations+=1
+            # elif req.service_type=="miot" and delay>5:
+            #     step_penalty+= (delay-5)
+            #     voilations+=1
             #print("step_penalty: ",step_penalty, " delay ", delay)
            
             evt = sim.create_event(tipo="termination",inicio=req.end_time, extra=req, f=func_terminate)
@@ -485,10 +494,10 @@ def resource_allocation(cn): #cn=controller
             step_profit += (profit_nodes + profit_links)/max_profit #the total profit in this step is the reward
             step_link_profit += profit_links/max_link_profit
             step_node_profit += profit_nodes/max_node_profit
-            if step_penalty==1000:
-                step_profit=0
-            else:
-                step_profit-= step_penalty/100
+            # if step_penalty==1000:
+            #     step_profit=0
+            # else:
+            #     step_profit-= step_penalty/100
             
             step_edge_profit = 0 #ajustar
             step_central_profit = 0#ajustar
@@ -513,8 +522,12 @@ def resource_allocation(cn): #cn=controller
             step_node_utl += (a+b)/((edge_initial+centralized_initial)*end_simulation_time)
             #step_total_utl += (a+b+(c*10))/((edge_initial+centralized_initial+bw_initial)*end_simulation_time)
             step_total_utl += (step_node_utl + step_links_bw_utl)/2
-    #print("accepted requests",sim.accepted_reqs,"\n")         
-    return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations
+        else:
+            rejection_count += 1
+    #print("accepted requests",sim.accepted_reqs,"\n") 
+    step_penalty += rejection_count*rejection_penalty
+    # step_penalty = 0
+    return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty
 
 def get_code(value):   
     cod = 0
@@ -694,6 +707,7 @@ def func_terminate(c,evt):
 contador_windows = 0
 def func_twindow(c,evt):
     #la venta de tiempo ha expirado. Las nslrs recolectadas hasta ahora seran analizadas para su admision
+    #The sale time has expired. The nslrs collected so far will be analyzed for admission
     global contador_windows
     sim = c.simulation 
     contador_windows += 1
@@ -707,17 +721,17 @@ def func_twindow(c,evt):
         #a = agente.take_action(s,True)
         
         a = agente.step(state,0)
-        print(agente.last_state," ",agente.last_action)
+        print("Last state:",agente.last_state," Last action:",agente.last_action)
     else:
         s = evt.extra["current_state"]
         a = evt.extra["action"]
-        print(agente.last_state," ",agente.last_action)
+        print("Last state:",agente.last_state," Last action:",agente.last_action)
         #print("##agent",agente.last_state," ",agente.last_action)
                 
       
     sim.granted_req_list, remaining_req_list = prioritizer(sim.window_req_list, a) #se filtra la lista de reqs dependiendo de la accion
     #la lista se envia al modulo de Resource Allocation
-    step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations = resource_allocation(c)
+    step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty = resource_allocation(c)
     c.total_profit += step_profit
     c.node_profit += step_node_profit
     c.link_profit += step_link_profit
@@ -729,9 +743,10 @@ def func_twindow(c,evt):
     c.edge_utl += step_edge_cpu_utl 
     c.central_utl += step_central_cpu_utl
     c.link_utl += step_links_bw_utl
-    c.total_voilations+=voilations
+    c.total_voilations += voilations
+    c.penalty += step_penalty
     
-    r = step_profit
+    r = step_profit - step_penalty
     next_state = get_state(c.substrate,c.simulation) #getting the next state    
     
     #s_ = translateStateToIndex(next_state) #getting index of the next state
@@ -768,14 +783,14 @@ def prepare_sim(s):
 
                                 
 def main():
-                                              
-# ▀████▄     ▄███▀     ██     ▀████▀███▄   ▀███▀
-#   ████    ████      ▄██▄      ██   ███▄    █  
-#   █ ██   ▄█ ██     ▄█▀██▄     ██   █ ███   █  
-#   █  ██  █▀ ██    ▄█  ▀██     ██   █  ▀██▄ █  
-#   █  ██▄█▀  ██    ████████    ██   █   ▀██▄█  
-#   █  ▀██▀   ██   █▀      ██   ██   █     ███  
-# ▄███▄ ▀▀  ▄████▄███▄   ▄████▄████▄███▄    ██ 
+                                                 
+# ▀████▄     ▄███▀     ██     ▀████▀███▄   ▀███▀ 
+#   ████    ████      ▄██▄      ██   ███▄    █   
+#   █ ██   ▄█ ██     ▄█▀██▄     ██   █ ███   █   
+#   █  ██  █▀ ██    ▄█  ▀██     ██   █  ▀██▄ █   
+#   █  ██▄█▀  ██    ████████    ██   █   ▀██▄█   
+#   █  ▀██▀   ██   █▀      ██   ██   █     ███   
+# ▄███▄ ▀▀  ▄████▄███▄   ▄████▄████▄███▄    ██    
                                                   
                                                       
     global edge_initial
@@ -815,6 +830,7 @@ def main():
         urllc_utl_rep = []
         miot_utl_rep = []    
         voilations = []
+        penalty = []
         
         for i in range(episodes):
             total_profit_rep.append([])
@@ -840,9 +856,13 @@ def main():
             urllc_utl_rep.append([])
             miot_utl_rep.append([])
             voilations.append([])
+            penalty.append([])
+
+        now = datetime.now()
+        current_time = now.strftime("%d-%m:%H:%M:%S")
         
-        agente = ddpg.Agent(9,n_actions)
         for i in range(repetitions):
+            agente = REINFORCE.Agent(9,n_actions)
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -861,7 +881,7 @@ def main():
                 prepare_sim(controller.simulation)            
                 controller.run()    
 
-                print(controller.simulation.current_instatiated_reqs[0], controller.simulation.current_instatiated_reqs[1], controller.simulation.current_instatiated_reqs[2])    
+                # print(controller.simulation.current_instatiated_reqs[0], controller.simulation.current_instatiated_reqs[1], controller.simulation.current_instatiated_reqs[2])    
 
                 total_profit_rep[j].append(controller.total_profit)
                 node_profit_rep[j].append(controller.node_profit)        
@@ -886,12 +906,15 @@ def main():
                 urllc_utl_rep[j].append(controller.urllc_utl)
                 miot_utl_rep[j].append(controller.miot_utl)
                 voilations[j].append(controller.total_voilations)
+                penalty[j].append(controller.penalty)
                 node_to_nslr.clear()
                 print("Cleared:",node_to_nslr)
+            # print(total_profit_rep)
+            # print("Average profit:",round(sum(total_profit_rep[i])/episodes,4))
 
             #bot.sendMessage("Repetition " + str(i) + " finishes!")
-            
-            f = open("./results/deepsara_"+str(m)+"delay_trial_3.txt","w+")
+
+            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "REINFORCE" + current_time +".txt","w+")
 
             f.write("Repetition: "+str(i)+"\n")
             f.write("**Reward:\n")
@@ -937,11 +960,13 @@ def main():
             f.write("**miot_utl_rep:\n")
             f.write(str(miot_utl_rep)+"\n\n") 
             f.write("**voilations:\n")
-            f.write(str(voilations)+"\n\n")        
+            f.write(str(voilations)+"\n\n")  
+            f.write("**Penalty:\n")
+            f.write(str(penalty)+"\n\n")        
             f.close()
+            # print("Total reqs:",controller.simulation.total_reqs,"Total embb reqs:",controller.simulation.total_embb_reqs,"Total URLLC reqs:",controller.simulation.total_urllc_reqs)
             agente.save()
-
-        plot_param_one_rep(total_profit_rep, repetitions, episodes)
+        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="REINFORCE")
 
 if __name__ == '__main__':
     #bot.sendMessage("Simulation starts!")
@@ -949,4 +974,4 @@ if __name__ == '__main__':
     main()
     end = time.time()
     # bot.sendMessage("Simulation finishes!")
-    # bot.sendMessage("total time: " + str(end-start))
+    print("total time: " + str(end-start))
