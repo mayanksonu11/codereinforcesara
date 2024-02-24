@@ -82,6 +82,15 @@ def calculate_request_utilization(nslr,end_simulation_time,substrate):
 
     return edge_utl, central_utl, links_utl
 
+
+def calculate_qoe(nslr):
+    if nslr.type == "urllc":
+        print("URLLC type qoe")
+    elif nslr.type == "embb":
+        print("eMBB type qoe")
+    else:
+        print("Miot type qoe")
+
 # def calculate_request_utilization(nslr,end_simulation_time,substrate):
 #     '''
 #         Calculates resource utilization of the current requests

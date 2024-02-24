@@ -13,15 +13,15 @@ import ddpg
 import time
 from datetime import datetime
 import plot_param
-
+import ppo
 import dqn
 
 # import bisect
 #simulation parameters
 # seed = 0
-repetitions = 5 #33
+repetitions = 1 #33
 #RL-specific parameters
-episodes = 20 #240
+episodes = 100 #240
 twindow_length = 1
 # embb_arrival_rate = 10 #5#1#2 #reqXsecond
 # urllc_arrival_rate = 40 #5#2.5 #reqXsecond
@@ -105,7 +105,8 @@ actions = [
 #7actions:
 #actions = [(1,1,1),(0.75,1,1),(1,1,0.75),(0.75,1,0.75),(0.75,1,0.5),(0.5,1,0.5),(0.5,1,0.25)] #list of tuples
 node_to_nslr = {}
-n_actions = len(actions)
+# n_actions = len(actions)
+n_actions = 3
 
 class Evento:
     def __init__(self, tipo, inicio, extra, function):
@@ -349,9 +350,10 @@ def prioritizer_v1(window_req_list,action_index): ##v1
 def takeFirst(elem):
     return elem[0]
 
-def prioritizer(window_req_list,action_index): #v2
+def prioritizer(window_req_list,action): #v2
     #print("****prioritizing...")
-    action = actions[action_index]
+    # action = actions[action_index]
+    print("Action:",action)
     action2 = []
     granted_req_list = []
     remaining_req_list = []
@@ -455,7 +457,7 @@ def resource_allocation(cn): #cn=controller
     max_profit = max_link_profit + max_node_profit
     step_penalty=0.000
     rejection_count = 0
-    rejection_penalty = 0
+    rejection_penalty = 1
     voilations=0
     global node_to_nslr
 
@@ -721,14 +723,14 @@ def func_twindow(c,evt):
         #a = agente.take_action(s,True)
         
         a = agente.step(state,0)
-        print("Last state:",agente.last_state," Last action:",agente.last_action)
+        print("Last state:",agente.last_state," Current action:",a)
     else:
         s = evt.extra["current_state"]
         a = evt.extra["action"]
-        print("Last state:",agente.last_state," Last action:",agente.last_action)
         #print("##agent",agente.last_state," ",agente.last_action)
-                
-      
+    print("Last state:",agente.last_state," Last action:",agente.last_action)
+    
+
     sim.granted_req_list, remaining_req_list = prioritizer(sim.window_req_list, a) #se filtra la lista de reqs dependiendo de la accion
     #la lista se envia al modulo de Resource Allocation
     step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty = resource_allocation(c)
@@ -755,7 +757,8 @@ def func_twindow(c,evt):
     
     s_ = next_state
     a_ = agente.step(s_,r)
-    
+    if not evt.extra["first_state"]:
+        agente.put_data(s, a, r, s_)
     a = a_
     s = s_
     if contador_windows  == (sim.run_till/twindow_length) - 2:
@@ -862,7 +865,7 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agente = REINFORCE.Agent(9,n_actions)
+            agente = ppo.Agent(9,n_actions)
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -914,7 +917,7 @@ def main():
 
             #bot.sendMessage("Repetition " + str(i) + " finishes!")
 
-            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "REINFORCE" + current_time +".txt","w+")
+            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "ppo" + current_time +".txt","w+")
 
             f.write("Repetition: "+str(i)+"\n")
             f.write("**Reward:\n")
@@ -966,7 +969,7 @@ def main():
             f.close()
             # print("Total reqs:",controller.simulation.total_reqs,"Total embb reqs:",controller.simulation.total_embb_reqs,"Total URLLC reqs:",controller.simulation.total_urllc_reqs)
             agente.save()
-        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="REINFORCE")
+        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="ppo")
 
 if __name__ == '__main__':
     #bot.sendMessage("Simulation starts!")

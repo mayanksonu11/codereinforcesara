@@ -42,7 +42,9 @@ class MuNet(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        mu = torch.tanh(self.fc_mu(x))*2 # Multipled by 2 because the action space of the Pendulum-v0 is [-2,2]
+        x = F.relu(self.fc_mu(x))
+        mu = F.sigmoid(x) # Multipled by 2 because the action space of the Pendulum-v0 is [-2,2]
+        # print(mu)
         return mu
 
 class QNet(nn.Module):
@@ -103,14 +105,14 @@ class Agent(object):
     def __init__(self,
                 state_space_size,
                 action_space_size,
-                target_update_freq=100, #1000, #cada n steps se actualiza la target network
+                target_update_freq=50, #1000, #cada n steps se actualiza la target network
                 discount=0.99,
                 batch_size=32,
                 max_explore=1,
                 min_explore=0.05,
                 anneal_rate=(1/5000), #100000),
                 replay_memory_size=100000,
-                replay_start_size= 500): #500): #10000): #despues de n steps comienza el replay
+                replay_start_size= 50): #500): #10000): #despues de n steps comienza el replay
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
 
@@ -180,7 +182,7 @@ class Agent(object):
         self.last_state = state
         self.last_action = action
 
-        return np.argmax(action.detach().numpy())
+        return action.detach().numpy()
 
     def policy(self, state, training):
         """Epsilon-greedy policy for training, greedy policy otherwise."""
