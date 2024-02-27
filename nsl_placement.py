@@ -275,10 +275,10 @@ def new_vlinks(nsl_graph_red, nsl_graph):
 
 def analyze_links(nsl_graph,substrate):
     '''
-    Toma la decision de aceptar o rechazar basado en shortest path
-    Encuentra el camino mas corto y con bw suficiente en cada link para instanciar
-    un v.link. Max num de hops permitido es 5
-    Si no hay un camino con hops <= 5 y suficiente bw, el nslr es rechazado 
+    Make the decision to accept or reject based on shortest path
+    Find the shortest path with enough bw in each link to instantiate
+    a v_link. Max number of hops allowed is 5
+    If there is no path with hops <= 5 and enough bw, the nslr is rejected 
     '''
 
     G = nx.node_link_graph(substrate.graph)#graph format

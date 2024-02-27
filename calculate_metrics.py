@@ -1,3 +1,5 @@
+service_price = {"urllc":100,"embb":10,"miot":1}
+
 def calculate_profit_nodes(nslr,end_simulation_time):
     #Calculates profit per time unit and then multiplies it by the nslr op. time
     #profit = revenue-cost 
@@ -5,7 +7,7 @@ def calculate_profit_nodes(nslr,end_simulation_time):
     revenue = 0    
     vnfs = nslr.nsl_graph_reduced["vnodes"]
     time = 0.0
-
+    price_charged = service_price[nslr.service_type]
     cf_cpu = 0 #cost factor of physical nodes(depends on node type)
     for vnf in vnfs:
         if vnf["type"] == 0:#central
@@ -15,7 +17,7 @@ def calculate_profit_nodes(nslr,end_simulation_time):
         # else:
         #     cf_cpu = 4 
         cost += vnf["cpu"]*cf_cpu
-        revenue += vnf["cpu"]*cf_cpu*2 #revenue es el doble del costo (hasta ahora) 
+        revenue += vnf["cpu"]*cf_cpu + price_charged #revenue es el doble del costo (hasta ahora) 
 
     if nslr.end_time > end_simulation_time:
         #si es mayor, se considera la porcion de tiempo hasta acabar la simulacion  
@@ -41,7 +43,7 @@ def calculate_profit_links(nslr,end_simulation_time):
         except KeyError:
             hops=0
         cost += vlink["bw"]*cf_bw*hops #cost is proportional to the number of hops
-        revenue += vlink["bw"]*cf_bw*5*1.5 #(5:se cobra considerando el max num de hops permitido y 1.5: un 50% adicional al cost con 5hops)
+        revenue += vlink["bw"]*cf_bw*5*1.5 #(5: charged considering the maximum number of hops allowed and 1.5: an additional 50% to the cost with 5hops)
 
     if nslr.end_time > end_simulation_time:
         #si es mayor, se considera la porcion de tiempo hasta acabar la simulacao  

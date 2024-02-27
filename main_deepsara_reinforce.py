@@ -30,7 +30,7 @@ twindow_length = 1
 embb_arrival_rate = 0
 urllc_arrival_rate = 0
 miot_arrival_rate = 0 
-arrival_rates = [50] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
+arrival_rates = [100] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
 
 mean_operation_time = 15
 
@@ -456,8 +456,13 @@ def resource_allocation(cn): #cn=controller
     max_link_profit = substrate.graph["max_bw_profit"]*sim.run_till
     max_profit = max_link_profit + max_node_profit
     step_penalty=0.000
+    step_qoe = 0
+    step_embb_qoe = 0
+    step_urllc_qoe = 0
+    step_mmtc_qoe = 0
+
     rejection_count = 0
-    rejection_penalty = 1
+    rejection_penalty = 0.1
     voilations=0
     global node_to_nslr
 
@@ -508,14 +513,17 @@ def resource_allocation(cn): #cn=controller
                 sim.current_instatiated_reqs[0] += 1
                 sim.embb_accepted_reqs += 1
                 step_embb_profit += profit_nodes/max_node_profit
+                # step_embb_qoe += calculate_metrics.calculate_qoe(req)
             elif req.service_type == "urllc":
                 sim.current_instatiated_reqs[1] += 1
                 sim.urllc_accepted_reqs += 1
                 step_urllc_profit += profit_nodes/max_node_profit
+                # step_urllc_qoe += calculate_metrics.calculate_qoe(req)
             else:
                 sim.current_instatiated_reqs[2] += 1
                 sim.miot_accepted_reqs += 1
                 step_miot_profit += profit_nodes/max_node_profit                       
+                # step_miot_qoe += calculate_metrics.calculate_qoe(req)
             
             a,b,c = calculate_metrics.calculate_request_utilization(req,end_simulation_time,substrate)
             step_edge_cpu_utl += a/(edge_initial*end_simulation_time)
@@ -806,9 +814,9 @@ def main():
     global node_to_nslr
     
     for m in arrival_rates:
-        embb_arrival_rate = m/3
-        urllc_arrival_rate = m/3
-        miot_arrival_rate = m/3        
+        embb_arrival_rate = m/8
+        urllc_arrival_rate = 2*m/8
+        miot_arrival_rate = 5*m/8        
         
         total_profit_rep = []
         link_profit_rep = []
@@ -865,7 +873,7 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agente = ppo.Agent(9,n_actions)
+            agente = ddpg.Agent(9,n_actions)
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -917,7 +925,7 @@ def main():
 
             #bot.sendMessage("Repetition " + str(i) + " finishes!")
 
-            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "ppo" + current_time +".txt","w+")
+            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "ddpg" + current_time +".txt","w+")
 
             f.write("Repetition: "+str(i)+"\n")
             f.write("**Reward:\n")
@@ -969,7 +977,7 @@ def main():
             f.close()
             # print("Total reqs:",controller.simulation.total_reqs,"Total embb reqs:",controller.simulation.total_embb_reqs,"Total URLLC reqs:",controller.simulation.total_urllc_reqs)
             agente.save()
-        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="ppo")
+        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="ddpg")
 
 if __name__ == '__main__':
     #bot.sendMessage("Simulation starts!")

@@ -221,6 +221,9 @@ class Agent(object):
 
     def save(self):
         return
+    
+    def put_data(self, state, action, reward, s_prime):
+        None
 
 def main():
     env = gym.make('Pendulum-v0')

@@ -2,19 +2,19 @@ import numpy
 import random
 import copy
 
-cpu_embb = (4,5) #cpu units range for eMBB
-cpu_urllc = (3.5,4) 
-cpu_miot = (4,4.5) 
+cpu_embb = (5,5) #cpu units range for eMBB
+cpu_urllc = (2,2) 
+cpu_miot = (1,1) 
 # bw_embb = (1,1) #Mbps
 # bw_urllc = (.50,.50) #Mbps
 # bw_miot = (.1,.3)
 
-bw_embb = (.5,.5) #Mbps
-bw_urllc = (.5,.5) #Mbps
-bw_miot = (.01,.01)
+bw_embb = (10,50) #Mbps
+bw_urllc = (0.5,1) #Mbps
+bw_miot = (0.1,0.5)
 
 total_request_list=list()
-delay_budget= {"embb":10,"urllc":1,"miot":5}
+delay_budget= {"embb":10,"urllc":1,"miot":500}
 #0:centralized, 1:edge
 nsl_graph_eMBB =  {
             "vnfs": [
@@ -88,6 +88,7 @@ class NSLR():
         self.bandera = random.randint(1,100)
         self.delay_budget = delay_budget[service_type]
         self.current_delay=-1
+        self.rate_demand = nsl_graph["rate_demand"]
 
     def set_nsl_graph_reduced(self,reduced_graph):
         self.nsl_graph_reduced = reduced_graph
@@ -124,9 +125,11 @@ def add_resources(nsl_graph,service_type):
     for v in nsl_graph["vnfs"]:
         v["cpu"] = random.uniform(cpu[0],cpu[1])
         # v["str"] = random.randint(strg[0],strg[1])
+    bw_req = random.uniform(bw[0],bw[1])
+    nsl_graph["rate_demand"] = bw_req
     for l in nsl_graph["vlinks"]:
         # l["bw"] = random.randint(bw[0],bw[1])
-        l["bw"] = random.uniform(bw[0],bw[1])
+        l["bw"] = bw_req
 
     return nsl_graph
 

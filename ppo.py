@@ -27,7 +27,9 @@ class PPO(nn.Module):
     def pi(self, x, softmax_dim = 0):
         x = F.relu(self.fc1(x))
         x = self.fc_pi(x)
-        action = F.sigmoid(F.relu(x))
+        action = F.softmax(x, dim=softmax_dim)
+        # action = F.sigmoid(F.relu(x))
+        # print("Action:",action)
         return action
     
     def v(self, x):
@@ -60,7 +62,11 @@ class PPO(nn.Module):
         
     def train_net(self):
         s, a, r, s_prime = self.make_batch()
-
+        a_arg_max = []
+        a_max = []
+        for j in range(len(a)):
+            a_arg_max.append([a[j].argmax()])
+            a_max.append([a[j].max()])
         for i in range(K_epoch):
             td_target = r + gamma * self.v(s_prime)
             delta = td_target - self.v(s)
@@ -74,9 +80,10 @@ class PPO(nn.Module):
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-            # pi = self.pi(s)
-            # pi_a = pi.gather(1,a)
-            # ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
+            pi = self.pi(s, softmax_dim=1)
+            # print("Pi:",pi," action:",a)
+            pi_a = pi.gather(1,torch.tensor(a_arg_max))
+            ratio = torch.exp(torch.log(pi_a) - torch.log(torch.tensor(a_max,dtype=float)))  # a/b == exp(log(a)-log(b))
             ratio = torch.tensor(1, dtype=float)
 
             surr1 = ratio * advantage
