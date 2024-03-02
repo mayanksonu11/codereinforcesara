@@ -30,7 +30,7 @@ twindow_length = 1
 embb_arrival_rate = 0
 urllc_arrival_rate = 0
 miot_arrival_rate = 0 
-arrival_rates = [100] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
+arrival_rates = [50] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
 
 mean_operation_time = 15
 
@@ -622,8 +622,114 @@ def translateStateToIndex(state):
 
     return int(index)
 
+def eval_std_dev_node(substrate,type):
+    node_list = substrate.graph["nodes"]
+    req_list = []
+    for node in node_list:
+        if node["type"] == type:
+            req_list.append(node["cpu"])
+    res = 0
+    if len(req_list) > 0:
+        res = np.std(req_list)
+    return res
 
-def get_state(substrate,simulation):    
+def eval_std_dev_link(substrate):
+    link_list = substrate.graph["links"]
+    req_list = []
+    for link in link_list:
+        req_list.append(link["bw"])
+
+    res = np.std(req_list)
+
+    return res
+
+def get_state_cont(substrate,simulation):  # continous state   
+    cod_avble_edge = (substrate.graph["edge_cpu"]/edge_initial)
+    cod_avble_central = (substrate.graph["centralized_cpu"]/centralized_initial)
+    cod_avble_bw = (substrate.graph["bw"]/bw_initial)
+    
+
+    total = 0
+    for i in simulation.current_instatiated_reqs:
+        total += i
+    if total == 0:
+        pct_embb, pct_urllc, pct_miot = 0,0,0
+    else:
+        pct_embb, pct_urllc, pct_miot = simulation.current_instatiated_reqs[0]*100/total,simulation.current_instatiated_reqs[1]*100/total,simulation.current_instatiated_reqs[2]*100/total 
+    cod_pct_embb = (pct_embb)
+    cod_pct_urllc = (pct_urllc)
+    cod_pct_miot = (pct_miot)
+
+    
+    contador = [0,0,0]
+    n = len(simulation.granted_req_list)
+    
+    if n == 0:
+        pct_arriv_embb, pct_arriv_urllc, pct_arriv_miot = 0,0,0
+    else:
+        for req in simulation.granted_req_list:
+            if req.service_type == "embb":
+                contador[0] += 1
+            elif req.service_type == "urllc":
+                contador[1] += 1
+            else:
+                contador[2] += 1
+        pct_arriv_embb, pct_arriv_urllc, pct_arriv_miot = contador[0]*100/n, contador[1]*100/n, contador[2]*100/n
+
+    cod_pct_arriv_embb = (pct_arriv_embb)
+    cod_pct_arriv_urllc = (pct_arriv_urllc)
+    cod_pct_arriv_miot = (pct_arriv_miot)
+
+
+    cod_std_dev_edge = eval_std_dev_node(substrate,1)    # edge 0
+    cod_std_dev_central = eval_std_dev_node(substrate,0) # centralized 0
+    cod_std_dev_link = eval_std_dev_link(substrate)
+
+    #3-parameter state:
+    #state = [np.float32(cod_avble_edge),np.float32(cod_avble_central),np.float32(cod_avble_bw)]
+
+    #6-parameter state:    
+    # state = [
+    #             np.float32(cod_avble_edge),
+    #             np.float32(cod_avble_central),
+    #             np.float32(cod_avble_bw),
+    #             np.float32(cod_pct_embb),
+    #             np.float32(cod_pct_urllc),
+    #             np.float32(cod_pct_miot)
+    #         ]
+
+    #9-parameter state:
+    state = [
+                np.float32(cod_avble_edge),
+                np.float32(cod_avble_central),
+                np.float32(cod_avble_bw),
+                np.float32(cod_pct_embb),
+                np.float32(cod_pct_urllc),
+                np.float32(cod_pct_miot),
+                np.float32(cod_pct_arriv_embb),
+                np.float32(cod_pct_arriv_urllc),
+                np.float32(cod_pct_arriv_miot)
+            ]
+    
+    # 12 parameter state
+    # state = [
+    #             np.float32(cod_avble_edge),
+    #             np.float32(cod_avble_central),
+    #             np.float32(cod_avble_bw),
+    #             np.float32(cod_pct_embb),
+    #             np.float32(cod_pct_urllc),
+    #             np.float32(cod_pct_miot),
+    #             np.float32(cod_pct_arriv_embb),
+    #             np.float32(cod_pct_arriv_urllc),
+    #             np.float32(cod_pct_arriv_miot),
+    #             np.float32(cod_std_dev_edge),
+    #             np.float32(cod_std_dev_central),
+    #             np.float32(cod_std_dev_link),
+    #         ]
+
+    return state
+
+def get_state(substrate,simulation):     # discrete states
     cod_avble_edge = get_code(substrate.graph["edge_cpu"]/edge_initial)
     cod_avble_central = get_code(substrate.graph["centralized_cpu"]/centralized_initial)
     cod_avble_bw = get_code(substrate.graph["bw"]/bw_initial)
@@ -660,32 +766,52 @@ def get_state(substrate,simulation):
     cod_pct_arriv_urllc = get_code(pct_arriv_urllc)
     cod_pct_arriv_miot = get_code(pct_arriv_miot)
 
+    cod_std_dev_edge = eval_std_dev_node(substrate,1)    # edge 0
+    cod_std_dev_central = eval_std_dev_node(substrate,0) # centralized 0
+    cod_std_dev_link = eval_std_dev_link(substrate)
+
 
     #3-parameter state:
-    #state = [np.float32(cod_avble_edge),np.float32(cod_avble_central),np.float32(cod_avble_bw)]
+    # state = [np.float32(cod_avble_edge),np.float32(cod_avble_central),np.float32(cod_avble_bw)]
 
     #6-parameter state:    
-    # state = [
-    #             np.float32(cod_avble_edge),
-    #             np.float32(cod_avble_central),
-    #             np.float32(cod_avble_bw),
-    #             np.float32(cod_pct_embb),
-    #             np.float32(cod_pct_urllc),
-    #             np.float32(cod_pct_miot)
-    #         ]
-
-    #9-parameter state:
     state = [
                 np.float32(cod_avble_edge),
                 np.float32(cod_avble_central),
                 np.float32(cod_avble_bw),
                 np.float32(cod_pct_embb),
                 np.float32(cod_pct_urllc),
-                np.float32(cod_pct_miot),
-                np.float32(cod_pct_arriv_embb),
-                np.float32(cod_pct_arriv_urllc),
-                np.float32(cod_pct_arriv_miot)
+                np.float32(cod_pct_miot)
             ]
+
+    #9-parameter state:
+    # state = [
+    #             np.float32(cod_avble_edge),
+    #             np.float32(cod_avble_central),
+    #             np.float32(cod_avble_bw),
+    #             np.float32(cod_pct_embb),
+    #             np.float32(cod_pct_urllc),
+    #             np.float32(cod_pct_miot),
+    #             np.float32(cod_pct_arriv_embb),
+    #             np.float32(cod_pct_arriv_urllc),
+    #             np.float32(cod_pct_arriv_miot)
+    #         ]
+
+    # 12 parameter state
+    # state = [
+    #             np.float32(cod_avble_edge),
+    #             np.float32(cod_avble_central),
+    #             np.float32(cod_avble_bw),
+    #             np.float32(cod_pct_embb),
+    #             np.float32(cod_pct_urllc),
+    #             np.float32(cod_pct_miot),
+    #             np.float32(cod_pct_arriv_embb),
+    #             np.float32(cod_pct_arriv_urllc),
+    #             np.float32(cod_pct_arriv_miot),
+    #             np.float32(cod_std_dev_edge),
+    #             np.float32(cod_std_dev_central),
+    #             np.float32(cod_std_dev_link),
+    #         ]
 
     return state
 
@@ -873,7 +999,7 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agente = ddpg.Agent(9,n_actions)
+            agente = ddpg.Agent(6,n_actions)
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -925,59 +1051,82 @@ def main():
 
             #bot.sendMessage("Repetition " + str(i) + " finishes!")
 
-            f = open("./results/deepsara_"+str(m)+"delay_trial_"+ "ddpg" + current_time +".txt","w+")
+            f = open("./results/" + current_time + "deepsara_"+str(m)+"delay_trial_"+ "ddpg" + ".txt","w+")
 
             f.write("Repetition: "+str(i)+"\n")
             f.write("**Reward:\n")
-            f.write(str(total_profit_rep)+"\n\n")
+            f.write(str(total_profit_rep)+"\n")
+            f.write("Average:" + plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
             f.write("**node_profit_rep:\n")
-            f.write(str(node_profit_rep)+"\n\n")
+            f.write(str(node_profit_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(node_profit_rep,repetitions,episodes))
             f.write("**link_profit_rep:\n")
-            f.write(str(link_profit_rep)+"\n\n")
+            f.write(str(link_profit_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(link_profit_rep,repetitions,episodes))
             f.write("**edge_profit_rep:\n")
-            f.write(str(edge_profit_rep)+"\n\n")
+            f.write(str(edge_profit_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(edge_profit_rep,repetitions,episodes))
             f.write("**central_profit_rep:\n")
-            f.write(str(central_profit_rep)+"\n\n")
+            f.write(str(central_profit_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(central_profit_rep,repetitions,episodes))
             f.write("**profit_embb_rep:\n")
-            f.write(str(profit_embb_rep)+"\n\n")
+            f.write(str(profit_embb_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(profit_embb_rep,repetitions,episodes))
             f.write("**profit_urllc_rep:\n")
-            f.write(str(profit_urllc_rep)+"\n\n")
+            f.write(str(profit_urllc_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(profit_urllc_rep,repetitions,episodes))
             f.write("**profit_miot_rep:\n")
-            f.write(str(profit_miot_rep)+"\n\n")
+            f.write(str(profit_miot_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(profit_miot_rep,repetitions,episodes))
 
             f.write("**Acceptance Rate:\n")
-            f.write(str(acpt_rate_rep)+"\n\n")
+            f.write(str(acpt_rate_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
             f.write("**acpt_rate_embb_rep:\n")
-            f.write(str(acpt_rate_embb_rep)+"\n\n")
+            f.write(str(acpt_rate_embb_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
             f.write("**acpt_rate_urllc_rep:\n")
-            f.write(str(acpt_rate_urllc_rep)+"\n\n")
+            f.write(str(acpt_rate_urllc_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
             f.write("**acpt_rate_miot_rep:\n")
-            f.write(str(acpt_rate_miot_rep)+"\n\n")
+            f.write(str(acpt_rate_miot_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
 
             f.write("**total_utl_rep:\n")
-            f.write(str(total_utl_rep)+"\n\n")
+            f.write(str(total_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(total_utl_rep,repetitions,episodes))
             f.write("**node_utl_rep:\n")
-            f.write(str(node_utl_rep)+"\n\n")
+            f.write(str(node_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
             f.write("**link_utl_rep:\n")
-            f.write(str(link_utl_rep)+"\n\n")
+            f.write(str(link_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
             f.write("**edge_ult_rep:\n")
-            f.write(str(edge_ult_rep)+"\n\n")
+            f.write(str(edge_ult_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(edge_ult_rep,repetitions,episodes))
             f.write("**central_utl_rep:\n")
-            f.write(str(central_utl_rep)+"\n\n")
+            f.write(str(central_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(central_utl_rep,repetitions,episodes))
             f.write("**embb_utl_rep:\n")
-            f.write(str(embb_utl_rep)+"\n\n")
+            f.write(str(embb_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(embb_utl_rep,repetitions,episodes))
             f.write("**urllc_utl_rep:\n")
-            f.write(str(urllc_utl_rep)+"\n\n")
+            f.write(str(urllc_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(urllc_utl_rep,repetitions,episodes))
             f.write("**miot_utl_rep:\n")
-            f.write(str(miot_utl_rep)+"\n\n") 
+            f.write(str(miot_utl_rep)+"\n") 
+            f.write("Average:"+plot_param.plot_param_multi_rep(miot_utl_rep,repetitions,episodes))
             f.write("**voilations:\n")
-            f.write(str(voilations)+"\n\n")  
+            f.write(str(voilations)+"\n")  
+            f.write("Average:"+plot_param.plot_param_multi_rep(voilations,repetitions,episodes))
             f.write("**Penalty:\n")
-            f.write(str(penalty)+"\n\n")        
+            f.write(str(penalty)+"\n")        
+            f.write("Average:"+plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
             f.close()
             # print("Total reqs:",controller.simulation.total_reqs,"Total embb reqs:",controller.simulation.total_embb_reqs,"Total URLLC reqs:",controller.simulation.total_urllc_reqs)
             agente.save()
-        plot_param.plot_param_multi_rep(total_profit_rep, repetitions, episodes, name="ddpg")
+        print("Node_utl:",plot_param.plot_param_multi_rep(node_utl_rep, repetitions, episodes, name="ddpg"))
+        print("Link_utl:",plot_param.plot_param_multi_rep(link_utl_rep, repetitions, episodes, name="ddpg"))
 
 if __name__ == '__main__':
     #bot.sendMessage("Simulation starts!")

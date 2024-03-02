@@ -20,16 +20,16 @@ def plot_param_one_rep(param, repitition, episode, name=""):
         # plt.plot(req_param)
         # for rep in range(repitition):
         #     print(req_param[rep])
-    print(my_list)
-    print("Average:",sum(my_list)/len(my_list))
+    # print(my_list)
+    average = sum(my_list)/len(my_list)
     now = datetime.now()
     current_time = now.strftime("%d-%m-%Y:%H:%M:%S")
     plt.plot(my_list)
     plt.savefig("./plots/plots_"+ name + "_" + current_time +".png")
-    plt.show()
+    # plt.show()
+    return average
 
 def plot_param_multi_rep(param, repitition, episode, name=""):
-    print(param)
     now = datetime.now()
     current_time = now.strftime("%d-%m-%Y-%H:%M:%S")
     # print("Current Time =", current_time)
@@ -39,7 +39,9 @@ def plot_param_multi_rep(param, repitition, episode, name=""):
         ep_avg_list.append(sum(ep_param)/len(ep_param))
         plt.plot(ep_param)
     # plt.savefig("./plots/plots_"+ name + "_" + current_time +".png")
-    print("Average:",sum(ep_avg_list)/len(ep_avg_list))
+    # print("Average:",sum(ep_avg_list)/len(ep_avg_list))
+    avg = sum(ep_avg_list)/len(ep_avg_list)
+    return str(round(avg,4)) + "\n\n"
     # plt.show()
 
 # plot_param_multi_rep(val,20,1)

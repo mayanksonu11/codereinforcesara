@@ -327,6 +327,60 @@ def analyze_links(nsl_graph,substrate):
 
     return reject
 
+def analyze_links_dijkstra(nsl_graph,substrate):
+    '''
+    Make the decision to accept or reject based on shortest path
+    Find the shortest path with enough bw in each link to instantiate
+    a v_link. Max number of hops allowed is 5
+    If there is no path with hops <= 5 and enough bw, the nslr is rejected 
+    '''
+
+    G = nx.node_link_graph(substrate.graph)#graph format
+    links = copy.deepcopy(substrate.graph["links"])#copia para trabajar temporalmente con ella
+    reject = False
+    max_hops = 5
+    vlinks = nsl_graph["vlinks"]
+    vnfs = nsl_graph["vnodes"]
+    for vlink in vlinks:
+        substrate_src = next(vnf["mapped_to"] for vnf in vnfs if vnf["id"] == vlink["source"]) 
+        substrate_dst = next(vnf["mapped_to"] for vnf in vnfs if vnf["id"] == vlink["target"])
+        # print("\n***vlink:",vlink)
+        # que hacer con las vnfs que se instancian en el mismo nodo? cobrar por vlink? cuanto?
+        paths = nx.shortest_path(G,source=substrate_src,target=substrate_dst,weight="bw")
+        path_list = [p for p in paths]
+        path_list.sort(key=len)
+        for path in path_list:
+            #verificar si todos los links en el path tienen recurso suficiente
+            enough = True
+            # print("*PATH:",path)
+            if len(path) >= max_hops:
+                reject = True
+                # print("hops number is 5 or higher")
+                break
+            else:    
+                for l in range(len(path)-1):
+
+                    link = next(lk for lk in links if ( (lk["source"]==path[l] and lk["target"]==path[l+1]) or (lk["source"]==path[l+1] and lk["target"]==path[l]) ) )
+                    # print("*",path[l],path[l+1])
+                    # print("link:",link["bw"])
+                    if vlink["bw"] <= link["bw"]: #hay suficiente bw                        
+                        link["bw"] -= vlink["bw"] #resource is updated
+                        # enough bw                       
+                    else:# not enough bw
+                        enough = False
+
+                if enough:
+                    # print("MAPEAR")
+                    vlink["mapped_to"] = path#si hubo bw suficiente en cada link del path, se mapea
+                    break
+                elif enough == False and path_list.index(path) == len(path_list)-1:
+                        reject = True              
+                
+        if reject:
+            break
+
+    return reject
+
 
 # substrate = ggen.ba_graph(str(1))
 # print(substrate)
