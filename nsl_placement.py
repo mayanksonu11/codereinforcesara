@@ -124,7 +124,7 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     
     ################## vlinks admission #################
     if not rejected:
-        rejected = analyze_links(nsl_graph_red,substrate)
+        rejected = analyze_links_dijkstra(nsl_graph_red,substrate)
     
     if not rejected:
         assert(delay > 0)
@@ -346,7 +346,8 @@ def analyze_links_dijkstra(nsl_graph,substrate):
         substrate_dst = next(vnf["mapped_to"] for vnf in vnfs if vnf["id"] == vlink["target"])
         # print("\n***vlink:",vlink)
         # que hacer con las vnfs que se instancian en el mismo nodo? cobrar por vlink? cuanto?
-        paths = nx.shortest_path(G,source=substrate_src,target=substrate_dst,weight="bw")
+        path_ = nx.shortest_path(G,source=substrate_src,target=substrate_dst,weight="bw")
+        paths = [path_]
         path_list = [p for p in paths]
         path_list.sort(key=len)
         for path in path_list:

@@ -389,15 +389,17 @@ def update_resources(substrate,nslr,kill):
     links = substrate.graph["links"]   
     for vnf in nslr.nsl_graph_reduced["vnodes"]:#se recorre los nodos del grafo reducido del nslr aceptado    
         if "mapped_to" in vnf:
+            print("VNF:",vnf)
             n = next(n for n in nodes if (n["id"] == vnf["mapped_to"] and n["type"]==vnf["type"]) )# 
             if vnf["type"] == 0:
                 tipo = "centralized_cpu"
             else:
                 tipo = "edge_cpu"
-         
+            assert(n["id"] == vnf["mapped_to"])
             if kill: #if it is kill process, resources are free again
                 
                 n["cpu"] = n["cpu"] + vnf["cpu"]
+                assert(n["cpu"] <= 100)
                 #print("Before size of array",len(node_to_nslr[n["id"]]))
                 try:
                     node_to_nslr[n["id"]].discard(nslr)
@@ -423,6 +425,7 @@ def update_resources(substrate,nslr,kill):
                 l = next(l for l in links if ( (l["source"]==path[i] and l["target"]==path[i+1]) or (l["source"]==path[i+1] and l["target"]==path[i]) ) )              
                 if kill:
                     l["bw"] += vlink["bw"]
+                    assert(l["bw"] <= 1000)
                     substrate.graph["bw"] += vlink["bw"]
                 else:
                     l["bw"] -= vlink["bw"]
@@ -461,8 +464,10 @@ def resource_allocation(cn): #cn=controller
     step_urllc_qoe = 0
     step_mmtc_qoe = 0
 
-    rejection_count = 0
-    rejection_penalty = 0.1
+    rejection_count_urllc = 0
+    rejection_count_embb = 0
+    rejection_count_miot = 0
+    rejection_penalty = 0.01
     voilations=0
     global node_to_nslr
 
@@ -527,14 +532,20 @@ def resource_allocation(cn): #cn=controller
             
             a,b,c = calculate_metrics.calculate_request_utilization(req,end_simulation_time,substrate)
             step_edge_cpu_utl += a/(edge_initial*end_simulation_time)
-            step_central_cpu_utl += b/(centralized_initial*end_simulation_time)
+            # step_central_cpu_utl += b/(centralized_initial*end_simulation_time)
             step_links_bw_utl += c*10/(bw_initial*end_simulation_time)
             step_node_utl += (a+b)/((edge_initial+centralized_initial)*end_simulation_time)
             #step_total_utl += (a+b+(c*10))/((edge_initial+centralized_initial+bw_initial)*end_simulation_time)
             step_total_utl += (step_node_utl + step_links_bw_utl)/2
         else:
-            rejection_count += 1
+            if req.service_type == "urllc":
+                rejection_count_urllc += 10
+            elif req.service_type == "embb":
+                rejection_count_embb += 2
+            else:
+                rejection_count_miot += 1
     #print("accepted requests",sim.accepted_reqs,"\n") 
+    rejection_count = rejection_count_urllc + rejection_count_embb + rejection_count_miot 
     step_penalty += rejection_count*rejection_penalty
     # step_penalty = 0
     return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty
@@ -729,6 +740,34 @@ def get_state_cont(substrate,simulation):  # continous state
 
     return state
 
+def get_state_new(substrate, simulation):
+    available_cpu = []
+    available_bw = []
+    for node in substrate.graph["nodes"]:
+        assert(node["cpu"] <= 100)
+        available_cpu.append(np.float32(node["cpu"]))
+    for link in substrate.graph["links"]:
+        assert(link["bw"] <= 1000)
+        available_bw.append(np.float32(link["bw"]))
+    state = available_cpu + available_bw
+
+    total = 0
+    for i in simulation.current_instatiated_reqs:
+        total += i
+    if total == 0:
+        pct_embb, pct_urllc, pct_miot = 0,0,0
+    else:
+        pct_embb, pct_urllc, pct_miot = simulation.current_instatiated_reqs[0]*100/total,simulation.current_instatiated_reqs[1]*100/total,simulation.current_instatiated_reqs[2]*100/total 
+    cod_pct_embb = get_code(pct_embb)
+    cod_pct_urllc = get_code(pct_urllc)
+    cod_pct_miot = get_code(pct_miot)
+
+    state.append(np.float32(cod_pct_embb))
+    state.append(np.float32(cod_pct_urllc))
+    state.append(np.float32(cod_pct_miot))
+
+    return state
+
 def get_state(substrate,simulation):     # discrete states
     cod_avble_edge = get_code(substrate.graph["edge_cpu"]/edge_initial)
     cod_avble_central = get_code(substrate.graph["centralized_cpu"]/centralized_initial)
@@ -851,7 +890,7 @@ def func_twindow(c,evt):
     if evt.extra["first_state"]:
         #first state index
         #todos los recursos al 100% (con granularidad de 5)
-        state = get_state(c.substrate,c.simulation)
+        state = get_state_new(c.substrate,c.simulation)
         
         #s = translateStateToIndex(state)
         #a = agente.take_action(s,True)
@@ -883,7 +922,7 @@ def func_twindow(c,evt):
     c.penalty += step_penalty
     
     r = step_profit - step_penalty
-    next_state = get_state(c.substrate,c.simulation) #getting the next state    
+    next_state = get_state_new(c.substrate,c.simulation) #getting the next state    
     
     #s_ = translateStateToIndex(next_state) #getting index of the next state
     #a_ = agente.take_action(s_,False) #select action for the next state    
@@ -999,7 +1038,7 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agente = ddpg.Agent(6,n_actions)
+            agente = ddpg.Agent(47,n_actions)
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -1057,6 +1096,27 @@ def main():
             f.write("**Reward:\n")
             f.write(str(total_profit_rep)+"\n")
             f.write("Average:" + plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
+            f.write("**Acceptance Rate:\n")
+            f.write(str(acpt_rate_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
+            f.write("**acpt_rate_embb_rep:\n")
+            f.write(str(acpt_rate_embb_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
+            f.write("**acpt_rate_urllc_rep:\n")
+            f.write(str(acpt_rate_urllc_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
+            f.write("**acpt_rate_miot_rep:\n")
+            f.write(str(acpt_rate_miot_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
+            f.write("**node_utl_rep:\n")
+            f.write(str(node_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
+            f.write("**link_utl_rep:\n")
+            f.write(str(link_utl_rep)+"\n")
+            f.write("Average:"+plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
+            f.write(str(penalty)+"\n")        
+            f.write("Average:"+plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
+
             f.write("**node_profit_rep:\n")
             f.write(str(node_profit_rep)+"\n")
             f.write("Average:"+plot_param.plot_param_multi_rep(node_profit_rep,repetitions,episodes))

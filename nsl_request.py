@@ -18,9 +18,9 @@ delay_budget= {"embb":10,"urllc":1,"miot":500}
 #0:centralized, 1:edge
 nsl_graph_eMBB =  {
             "vnfs": [
-                        {"id":0,"function":"AMF","type":0,"backup":0},
-                        {"id":1,"function":"AMF","type":0,"backup":0},
-                        {"id":2,"function":"SMF","type":0,"backup":0},
+                        {"id":0,"function":"AMF","type":1,"backup":0},
+                        {"id":1,"function":"AMF","type":1,"backup":0},
+                        {"id":2,"function":"SMF","type":1,"backup":0},
                         {"id":3,"function":"UPF","type":1,"backup":0}
                         # {"id":4,"function":"UPF","type":1,"backup":0}
                         # {"id":5,"function":"UPF","type":1,"backup":0},
@@ -38,10 +38,10 @@ nsl_graph_eMBB =  {
 }
 nsl_graph_URLLC =  {
             "vnfs": [
-                        {"id":0,"function":"AMF","type":0,"backup":0},
-                        {"id":1,"function":"AMF","type":0,"backup":1},
-                        {"id":2,"function":"SMF","type":0,"backup":0},
-                        {"id":3,"function":"SMF","type":0,"backup":1},
+                        {"id":0,"function":"AMF","type":1,"backup":0},
+                        {"id":1,"function":"AMF","type":1,"backup":1},
+                        {"id":2,"function":"SMF","type":1,"backup":0},
+                        {"id":3,"function":"SMF","type":1,"backup":1},
                         {"id":4,"function":"UPF","type":1,"backup":0},
                         {"id":5,"function":"UPF","type":1,"backup":1},
                         {"id":6,"function":"UPF","type":1,"backup":2},
@@ -63,11 +63,11 @@ nsl_graph_URLLC =  {
 }
 nsl_graph_MIoT =  {
             "vnfs": [
-                        {"id":0,"function":"AMF","type":0,"backup":0},
-                        {"id":1,"function":"AMF","type":0,"backup":0},
-                        {"id":2,"function":"AMF","type":0,"backup":0},
-                        {"id":3,"function":"SMF","type":0,"backup":0},
-                        {"id":4,"function":"UPF","type":0,"backup":0}
+                        {"id":0,"function":"AMF","type":1,"backup":0},
+                        {"id":1,"function":"AMF","type":1,"backup":0},
+                        {"id":2,"function":"AMF","type":1,"backup":0},
+                        {"id":3,"function":"SMF","type":1,"backup":0},
+                        {"id":4,"function":"UPF","type":1,"backup":0}
             ],
             "vlinks":[
                         {"source":0,"target":3},
