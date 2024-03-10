@@ -32,6 +32,7 @@ def delay_node(percent_util):# to change the function
 
 def nsl_placement(nslr, substrate, node_to_nslr):
     global ranked_nodes_cpu
+    curr_id = nslr.id
     copy_node_to_nslr = node_to_nslr
     profit_nodes = 0
     profit_links = 0
@@ -124,12 +125,13 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     
     ################## vlinks admission #################
     if not rejected:
-        rejected = analyze_links_dijkstra(nsl_graph_red,substrate)
+        rejected = analyze_links_dijkstra(nslr.nsl_graph_reduced,substrate)
     
     if not rejected:
         assert(delay > 0)
         nslr.current_delay = delay
-        print("Successfully accepted:",nslr.service_type," cpu:",total_cpu, " delay:", delay)
+        nslr.set_nsl_graph_reduced(nslr.nsl_graph_reduced)
+        # print("Successfully accepted:",nslr.service_type," cpu:",total_cpu, " delay:", delay)
     else:
         node_to_nslr = copy_node_to_nslr
         assert(node_to_nslr == copy_node_to_nslr)
@@ -139,6 +141,7 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     # if rejected:
     #     print("\n\n","***rejected by scarce link rsc","\n\n")
     #print("Mapping of node to nslr",node_to_nslr)
+    assert(curr_id == nslr.id)
     return rejected, delay 
 
 def sort_nodes(node_list,sortby):       
@@ -341,6 +344,7 @@ def analyze_links_dijkstra(nsl_graph,substrate):
     max_hops = 5
     vlinks = nsl_graph["vlinks"]
     vnfs = nsl_graph["vnodes"]
+    # print("In Analyze links:",vnfs)
     for vlink in vlinks:
         substrate_src = next(vnf["mapped_to"] for vnf in vnfs if vnf["id"] == vlink["source"]) 
         substrate_dst = next(vnf["mapped_to"] for vnf in vnfs if vnf["id"] == vlink["target"])

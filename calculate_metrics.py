@@ -2,7 +2,8 @@ service_price = {"urllc":100,"embb":10,"miot":1}
 
 def calculate_profit_nodes(nslr,end_simulation_time):
     #Calculates profit per time unit and then multiplies it by the nslr op. time
-    #profit = revenue-cost 
+    #profit = revenue-cost
+    curr_id = nslr.id 
     cost = 0
     revenue = 0    
     vnfs = nslr.nsl_graph_reduced["vnodes"]
@@ -26,11 +27,13 @@ def calculate_profit_nodes(nslr,end_simulation_time):
         time = nslr.operation_time
 
     profit = (revenue-cost)*time 
+    assert(curr_id == nslr.id)
     return profit
 
 def calculate_profit_links(nslr,end_simulation_time):
     #Calculates profit per time unit and then multiplies it by the nslr op. time
     #profit = revenue-cost 
+    curr_id = nslr.id 
     cost = 0
     revenue = 0        
     vlinks = nslr.nsl_graph_reduced["vlinks"]    
@@ -52,9 +55,11 @@ def calculate_profit_links(nslr,end_simulation_time):
         time = nslr.operation_time
 
     profit = (revenue-cost)*time
+    assert(curr_id == nslr.id)
     return profit
 
 def calculate_request_utilization(nslr,end_simulation_time,substrate):
+    curr_id = nslr.id
     vnfs = nslr.nsl_graph_reduced["vnodes"]
     vlinks = nslr.nsl_graph_reduced["vlinks"]
     time = 0.0
@@ -82,6 +87,7 @@ def calculate_request_utilization(nslr,end_simulation_time,substrate):
     central_utl = central_sum*time
     links_utl = bw_sum*time  
 
+    assert(curr_id == nslr.id)
     return edge_utl, central_utl, links_utl
 
 

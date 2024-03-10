@@ -7,13 +7,13 @@ cpu_urllc = (2,2)
 cpu_miot = (1,1) 
 # bw_embb = (1,1) #Mbps
 # bw_urllc = (.50,.50) #Mbps
-# bw_miot = (.1,.3)
+# bw_miot = (.1,.3)SS
 
 bw_embb = (10,50) #Mbps
 bw_urllc = (0.5,1) #Mbps
 bw_miot = (0.1,0.5)
 
-total_request_list=list()
+total_request_list=dict()
 delay_budget= {"embb":10,"urllc":1,"miot":500}
 #0:centralized, 1:edge
 nsl_graph_eMBB =  {
@@ -91,7 +91,11 @@ class NSLR():
         self.rate_demand = nsl_graph["rate_demand"]
 
     def set_nsl_graph_reduced(self,reduced_graph):
-        self.nsl_graph_reduced = reduced_graph
+        # print("Nsl graph updated for id:",self.id)
+        self.nsl_graph_reduced = copy.deepcopy(reduced_graph)
+    
+    def get_nsl_graph_reduced(self):
+        return self.nsl_graph_reduced
 
     def set_end_time(self,end_time):
         self.end_time = end_time
@@ -144,7 +148,7 @@ def get_nslr(id,service_type,mean_operation_time):
  
     nsl_graph = add_resources(copy.deepcopy(nsl_graph),service_type)
     request = NSLR(id,service_type,get_operation_time(mean_operation_time),nsl_graph)
-    total_request_list.append(copy.deepcopy(request))
+    total_request_list[id] = copy.deepcopy(request)
     return request
 
 def fetch_by_id(id):

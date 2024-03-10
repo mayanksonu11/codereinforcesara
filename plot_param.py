@@ -41,7 +41,7 @@ def plot_param_multi_rep(param, repitition, episode, name=""):
     # plt.savefig("./plots/plots_"+ name + "_" + current_time +".png")
     # print("Average:",sum(ep_avg_list)/len(ep_avg_list))
     avg = sum(ep_avg_list)/len(ep_avg_list)
-    return str(round(avg,4)) + "\n\n"
+    return str(round(avg,4)) + "\n"
     # plt.show()
 
 # plot_param_multi_rep(val,20,1)

@@ -189,7 +189,8 @@ class Agent(object):
         state = np.array(state)
         action =  self.mu(torch.from_numpy(state).float()) 
         for i in range(len(action)):
-            action[i] = action[i] + self.ou_noise()[i]
+            action[i] = max(0, action[i] + self.ou_noise()[i])
+
         return action
 
     def soft_update(self, net, net_target):

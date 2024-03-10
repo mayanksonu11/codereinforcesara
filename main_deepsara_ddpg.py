@@ -19,7 +19,7 @@ import dqn
 # import bisect
 #simulation parameters
 # seed = 0
-repetitions = 1 #33
+repetitions = 5 #33
 #RL-specific parameters
 episodes = 100 #240
 twindow_length = 1
@@ -211,12 +211,17 @@ class Sim:
         #         index = i 
         #         break
         #     else:
-        #         index = i+1 
+        #         index = i+1
+        # if evt.tipo == "termination":
+        #     print("Terminate called for nslr:",evt.extra.nsl_graph_reduced["vnodes"],"at time:",evt.inicio)
         index = self.binary_search(self.eventos, 0, len(self.eventos)-1, evt.inicio)
         self.eventos = self.eventos[:index] + [evt] + self.eventos[index:] 
+        # print("Events:")
+        # for events in self.eventos:
+        #     print("(",events.inicio,events.tipo,")",end=" ")
+        # print()
         # self.eventos.insert(index,evt)
         # self.eventos[index:index] = [evt]
-
         if evt.tipo == "arrival":            
             #agregar nslrs en window list
             self.total_reqs += 1
@@ -366,10 +371,10 @@ def prioritizer(window_req_list,action): #v2
 
     #de acuerdo a "action", ordenar "action2"
     action2.sort(key=takeFirst,reverse=True)
-
+    print("Action2:",action2)
     for j in action2:
         
-        if j[0]==1:
+        if j[0]>=1:
             granted_req_list += window_req_list[j[2]]
             
         else:    
@@ -378,18 +383,19 @@ def prioritizer(window_req_list,action): #v2
                     granted_req_list.append(window_req_list[j[2]][i])
                 else:
                     remaining_req_list.append(window_req_list[j[2]][i])      
-
     return granted_req_list, remaining_req_list #v6
     #return granted_req_list+remaining_req_list, remaining_req_list #v1
 
 def update_resources(substrate,nslr,kill):
    
     global node_to_nslr
+    curr_id = nslr.id
     nodes = substrate.graph["nodes"]
-    links = substrate.graph["links"]   
+    links = substrate.graph["links"]
+    # print("Request id:",nslr.id)   
     for vnf in nslr.nsl_graph_reduced["vnodes"]:#se recorre los nodos del grafo reducido del nslr aceptado    
         if "mapped_to" in vnf:
-            print("VNF:",vnf)
+            # print("VNF:",vnf, "Kill:",kill)
             n = next(n for n in nodes if (n["id"] == vnf["mapped_to"] and n["type"]==vnf["type"]) )# 
             if vnf["type"] == 0:
                 tipo = "centralized_cpu"
@@ -399,7 +405,7 @@ def update_resources(substrate,nslr,kill):
             if kill: #if it is kill process, resources are free again
                 
                 n["cpu"] = n["cpu"] + vnf["cpu"]
-                assert(n["cpu"] <= 100)
+                # assert(n["cpu"] <= 100)
                 #print("Before size of array",len(node_to_nslr[n["id"]]))
                 try:
                     node_to_nslr[n["id"]].discard(nslr)
@@ -425,13 +431,15 @@ def update_resources(substrate,nslr,kill):
                 l = next(l for l in links if ( (l["source"]==path[i] and l["target"]==path[i+1]) or (l["source"]==path[i+1] and l["target"]==path[i]) ) )              
                 if kill:
                     l["bw"] += vlink["bw"]
-                    assert(l["bw"] <= 1000)
+                    # assert(l["bw"] <= 1000)
                     substrate.graph["bw"] += vlink["bw"]
                 else:
                     l["bw"] -= vlink["bw"]
                     substrate.graph["bw"] -= vlink["bw"]
             except StopIteration:
                 pass
+
+    assert(curr_id == nslr.id)
    
 
 def resource_allocation(cn): #cn=controller
@@ -495,7 +503,7 @@ def resource_allocation(cn): #cn=controller
             #     step_penalty+= (delay-5)
             #     voilations+=1
             #print("step_penalty: ",step_penalty, " delay ", delay)
-           
+            # print("id:",req.id,"Succesful req:",req.nsl_graph_reduced["vnodes"])
             evt = sim.create_event(tipo="termination",inicio=req.end_time, extra=req, f=func_terminate)
             sim.add_event(evt) 
 
@@ -744,11 +752,11 @@ def get_state_new(substrate, simulation):
     available_cpu = []
     available_bw = []
     for node in substrate.graph["nodes"]:
-        assert(node["cpu"] <= 100)
-        available_cpu.append(np.float32(node["cpu"]))
+        # assert(node["cpu"] <= 100)
+        available_cpu.append(np.float32((node["cpu"])))
     for link in substrate.graph["links"]:
-        assert(link["bw"] <= 1000)
-        available_bw.append(np.float32(link["bw"]))
+        # assert(link["bw"] <= 1000)
+        available_bw.append(np.float32((link["bw"]/100)))
     state = available_cpu + available_bw
 
     total = 0
@@ -762,15 +770,40 @@ def get_state_new(substrate, simulation):
     cod_pct_urllc = get_code(pct_urllc)
     cod_pct_miot = get_code(pct_miot)
 
-    state.append(np.float32(cod_pct_embb))
-    state.append(np.float32(cod_pct_urllc))
-    state.append(np.float32(cod_pct_miot))
+    contador = [0,0,0]
+    n = len(simulation.granted_req_list)
+
+    # state.append(np.float32(cod_pct_embb))
+    # state.append(np.float32(cod_pct_urllc))
+    # state.append(np.float32(cod_pct_miot))
+    
+    if n == 0:
+        pct_arriv_embb, pct_arriv_urllc, pct_arriv_miot = 0,0,0
+    else:
+        for req in simulation.granted_req_list:
+            if req.service_type == "embb":
+                contador[0] += 1
+            elif req.service_type == "urllc":
+                contador[1] += 1
+            else:
+                contador[2] += 1
+        pct_arriv_embb, pct_arriv_urllc, pct_arriv_miot = contador[0]*100/n, contador[1]*100/n, contador[2]*100/n
+
+    cod_pct_arriv_embb = get_code(pct_arriv_embb)
+    cod_pct_arriv_urllc = get_code(pct_arriv_urllc)
+    cod_pct_arriv_miot = get_code(pct_arriv_miot)
+
+    state.append(np.float32(pct_arriv_embb))
+    state.append(np.float32(pct_arriv_urllc))
+    state.append(np.float32(pct_arriv_miot))
 
     return state
 
 def get_state(substrate,simulation):     # discrete states
     cod_avble_edge = get_code(substrate.graph["edge_cpu"]/edge_initial)
-    cod_avble_central = get_code(substrate.graph["centralized_cpu"]/centralized_initial)
+    cod_avble_central = 0
+    if centralized_initial > 0:
+        cod_avble_central = get_code(substrate.graph["centralized_cpu"]/centralized_initial)
     cod_avble_bw = get_code(substrate.graph["bw"]/bw_initial)
     
 
@@ -814,27 +847,27 @@ def get_state(substrate,simulation):     # discrete states
     # state = [np.float32(cod_avble_edge),np.float32(cod_avble_central),np.float32(cod_avble_bw)]
 
     #6-parameter state:    
-    state = [
-                np.float32(cod_avble_edge),
-                np.float32(cod_avble_central),
-                np.float32(cod_avble_bw),
-                np.float32(cod_pct_embb),
-                np.float32(cod_pct_urllc),
-                np.float32(cod_pct_miot)
-            ]
-
-    #9-parameter state:
     # state = [
     #             np.float32(cod_avble_edge),
     #             np.float32(cod_avble_central),
     #             np.float32(cod_avble_bw),
     #             np.float32(cod_pct_embb),
     #             np.float32(cod_pct_urllc),
-    #             np.float32(cod_pct_miot),
-    #             np.float32(cod_pct_arriv_embb),
-    #             np.float32(cod_pct_arriv_urllc),
-    #             np.float32(cod_pct_arriv_miot)
+    #             np.float32(cod_pct_miot)
     #         ]
+
+    #9-parameter state:
+    state = [
+                np.float32(cod_avble_edge),
+                np.float32(cod_avble_central),
+                np.float32(cod_avble_bw),
+                np.float32(cod_pct_embb),
+                np.float32(cod_pct_urllc),
+                np.float32(cod_pct_miot),
+                np.float32(cod_pct_arriv_embb),
+                np.float32(cod_pct_arriv_urllc),
+                np.float32(cod_pct_arriv_miot)
+            ]
 
     # 12 parameter state
     # state = [
@@ -869,8 +902,11 @@ def func_terminate(c,evt):
     global contador_termination
     sim = c.simulation
     contador_termination +=1
-    print("terminating")
     request = evt.extra
+    print("req id:", request.id, "terminating at req_end_time:",request.end_time)
+    # print("Reduced nsl graph:",request.nsl_graph_reduced["vnodes"])
+    # print("Stored nsl graph:",evt.extra.get_nsl_graph_reduced())
+    request.nsl_graph_reduced = evt.extra.get_nsl_graph_reduced()
     update_resources(c.substrate,request,True)
     if request.service_type == "embb":
         sim.current_instatiated_reqs[0] -= 1
@@ -1038,7 +1074,8 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agente = ddpg.Agent(47,n_actions)
+            agente = ddpg.Agent(47,n_actions) # creating a ddpg agent
+            
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
 
@@ -1046,7 +1083,7 @@ def main():
                 agente.handle_episode_start()
 
                 print("\n","episode:",j,"\n")
-                controller = None
+                #controller = None
                 controller = Controlador()                   
                 controller.substrate = copy.deepcopy(substrate_graphs.get_graph("16node_BA")) #get substrate  
                 # controller.substrate = copy.deepcopy(substrate_graphs.get_graph("abilene")) #get substrate    
@@ -1093,6 +1130,14 @@ def main():
             f = open("./results/" + current_time + "deepsara_"+str(m)+"delay_trial_"+ "ddpg" + ".txt","w+")
 
             f.write("Repetition: "+str(i)+"\n")
+            f.write(plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
             f.write("**Reward:\n")
             f.write(str(total_profit_rep)+"\n")
             f.write("Average:" + plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
@@ -1114,6 +1159,7 @@ def main():
             f.write("**link_utl_rep:\n")
             f.write(str(link_utl_rep)+"\n")
             f.write("Average:"+plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
+            f.write("**Penalty:\n")
             f.write(str(penalty)+"\n")        
             f.write("Average:"+plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
 
