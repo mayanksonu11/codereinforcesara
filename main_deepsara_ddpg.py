@@ -146,8 +146,8 @@ class Controlador:
         self.total_voilations=0
         self.penalty=0
 
-        self.simulation = Sim()
-        self.substrate = {}
+        self.simulation = Sim()     # Sim 
+        self.substrate = {}    #dictionary key value pair 
         self.agente = None
 
 
@@ -161,8 +161,8 @@ class Sim:
         self.window_req_list = [[],[],[]] #
         #self.window_req_list = []
         self.granted_req_list = []
-        self.horario = 0
-        self.run_till = -1
+        self.horario = 0     # current time 
+        self.run_till = -1    # till when simualtion runs 
         self.total_reqs = 0
         self.total_embb_reqs = 0
         self.total_urllc_reqs = 0
@@ -475,7 +475,7 @@ def resource_allocation(cn): #cn=controller
     rejection_count_urllc = 0
     rejection_count_embb = 0
     rejection_count_miot = 0
-    rejection_penalty = 0.01
+    rejection_penalty = 0.001
     voilations=0
     global node_to_nslr
 
@@ -547,7 +547,7 @@ def resource_allocation(cn): #cn=controller
             step_total_utl += (step_node_utl + step_links_bw_utl)/2
         else:
             if req.service_type == "urllc":
-                rejection_count_urllc += 10
+                rejection_count_urllc += 3
             elif req.service_type == "embb":
                 rejection_count_embb += 2
             else:
@@ -555,6 +555,7 @@ def resource_allocation(cn): #cn=controller
     #print("accepted requests",sim.accepted_reqs,"\n") 
     rejection_count = rejection_count_urllc + rejection_count_embb + rejection_count_miot 
     step_penalty += rejection_count*rejection_penalty
+    step_profit -= step_penalty
     # step_penalty = 0
     return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty
 
@@ -957,7 +958,7 @@ def func_twindow(c,evt):
     c.total_voilations += voilations
     c.penalty += step_penalty
     
-    r = step_profit - step_penalty
+    r = step_profit 
     next_state = get_state_new(c.substrate,c.simulation) #getting the next state    
     
     #s_ = translateStateToIndex(next_state) #getting index of the next state
