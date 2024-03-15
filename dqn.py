@@ -43,9 +43,9 @@ class ReplayBuffer():
         return len(self.buffer)
 
 class Qnet(nn.Module):
-    def __init__(self):
+    def __init__(self, state_space_size):
         super(Qnet, self).__init__()
-        self.fc1 = nn.Linear(9, 128)
+        self.fc1 = nn.Linear(state_space_size, 128)
         self.fc2 = nn.Linear(128, 128)
         self.fc3 = nn.Linear(128, 30)
 
@@ -103,9 +103,9 @@ class Agent(object):
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
 
-        self.q = Qnet()
+        self.q = Qnet(state_space_size)
         self.optimizer = optim.Adam(self.q.parameters(), lr=learning_rate)
-        self.q_target = Qnet()
+        self.q_target = Qnet(state_space_size)
         self.q_target.load_state_dict(self.q.state_dict())
         self.score=0
 
@@ -186,6 +186,9 @@ class Agent(object):
         return action
     
     def save(self):
+        None
+
+    def put_data(self,s,a,r,s_):
         None
 
     # def update_target_network(self):

@@ -1,4 +1,4 @@
-service_price = {"urllc":100,"embb":10,"miot":1}
+service_price = {"urllc":100,"embb":40,"miot":10}
 
 def calculate_profit_nodes(nslr,end_simulation_time):
     #Calculates profit per time unit and then multiplies it by the nslr op. time

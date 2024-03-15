@@ -13,12 +13,12 @@ learning_rate = 0.0002
 gamma         = 0.98
 
 class Policy(nn.Module):
-    def __init__(self):
+    def __init__(self,state_space_size):
         super(Policy, self).__init__()
         self.data = []
         
-        self.fc1 = nn.Linear(9, 128)
-        self.fc2 = nn.Linear(128, 30)
+        self.fc1 = nn.Linear(state_space_size, 128)
+        self.fc2 = nn.Linear(128, 3)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         
     def forward(self, x):
@@ -84,12 +84,12 @@ class Agent(object):
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
         
-        self.q = Policy()
+        self.q = Policy(state_space_size)
         # self.optimizer = optim.Adam(self.q.parameters(), lr=learning_rate)
         if(path != ""):
             self.q.load_state_dict(torch.load(path))
             self.q.eval()
-        self.q_target = Policy()
+        self.q_target = Policy(action_space_size)
         self.q_target.load_state_dict(self.q.state_dict())
         self.score=0
 

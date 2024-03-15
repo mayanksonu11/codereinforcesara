@@ -11,7 +11,6 @@ import torch.optim as optim
 lr_mu        = 0.0005
 lr_q         = 0.001
 gamma        = 0.99
-batch_size   = 32
 buffer_limit = 50000
 tau          = 0.005 # for target network soft update
 
@@ -107,12 +106,12 @@ class Agent(object):
                 action_space_size,
                 target_update_freq=50, #1000, #cada n steps se actualiza la target network
                 discount=0.99,
-                batch_size=32,
+                batch_size=80,
                 max_explore=1,
                 min_explore=0.05,
                 anneal_rate=(1/5000), #100000),
                 replay_memory_size=100000,
-                replay_start_size= 50): #500): #10000): #despues de n steps comienza el replay
+                replay_start_size= 100): #500): #10000): #despues de n steps comienza el replay
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
 
@@ -169,13 +168,12 @@ class Agent(object):
                     "reward": last_reward,
                     "next_state": state
                 }
-
+                # print("Experience:",experience)
                 self.memory.put(experience)
 
-            if self.steps > self.replay_start_size: #para acumular cierta cantidad de experiences antes de comenzar el entrenamiento
-                self.train(self.mu, self.mu_target, self.q, self.q_target, self.memory, self.q_optimizer, self.mu_optimizer)
-
-                if self.steps % self.target_update_freq == 0: #el clon de la red se realiza cada cierta cant de steps
+            if self.steps % self.replay_start_size == 0: #para acumular cierta cantidad de experiences antes de comenzar el entrenamiento
+                for i in range(10):
+                    self.train(self.mu, self.mu_target, self.q, self.q_target, self.memory, self.q_optimizer, self.mu_optimizer)
                     self.soft_update(self.mu, self.mu_target)
                     self.soft_update(self.q,  self.q_target)
 
@@ -183,6 +181,7 @@ class Agent(object):
         self.last_action = action
 
         return action.detach().numpy()
+        # return [1,1,1]
 
     def policy(self, state, training):
         """Epsilon-greedy policy for training, greedy policy otherwise."""
@@ -198,7 +197,7 @@ class Agent(object):
             param_target.data.copy_(param_target.data * (1.0 - tau) + param.data * tau)
 
     def train(self, mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
-        batch  = memory.sample(batch_size)
+        batch  = memory.sample(self.batch_size)
         inputs = np.array([b["state"] for b in batch]) #####
         actions = [b["action"] for b in batch]
         rewards = np.array([b["reward"] for b in batch])

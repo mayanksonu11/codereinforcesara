@@ -25,7 +25,7 @@ def plot_param_one_rep(param, repitition, episode, name=""):
     now = datetime.now()
     current_time = now.strftime("%d-%m-%Y:%H:%M:%S")
     plt.plot(my_list)
-    plt.savefig("./plots/plots_"+ name + "_" + current_time +".png")
+    # plt.savefig("./plots/plots_"+ name + "_" + current_time +".png")
     # plt.show()
     return average
 
@@ -44,6 +44,15 @@ def plot_param_multi_rep(param, repitition, episode, name=""):
     return str(round(avg,4)) + "\n"
     # plt.show()
 
+def plot_var(var_name):
+    now = datetime.now()
+    current_time = now.strftime("%d-%m-%Y-%H:%M:%S")
+    # print("Var:",var_name)
+    plt.plot(var_name)
+    plt.savefig("./plots/plots_"+ str(current_time) +".png")
+    plt.show()
+
 # plot_param_multi_rep(val,20,1)
-plot_param_one_rep(val,1,100)
+# plot_param_one_rep(val,1,100)
+# plot_var([0,0.2,0.5])
 # print(sum(val)/len(val)) 

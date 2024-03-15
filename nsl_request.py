@@ -10,7 +10,7 @@ cpu_miot = (1,1)
 # bw_miot = (.1,.3)SS
 
 bw_embb = (10,50) #Mbps
-bw_urllc = (0.5,1) #Mbps
+bw_urllc = (1,5) #Mbps
 bw_miot = (0.1,0.5)
 
 total_request_list=dict()

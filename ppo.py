@@ -15,11 +15,11 @@ K_epoch       = 3
 T_horizon     = 20
 
 class PPO(nn.Module):
-    def __init__(self):
+    def __init__(self,state_size):
         super(PPO, self).__init__()
         self.data = []
         
-        self.fc1   = nn.Linear(9,256)
+        self.fc1   = nn.Linear(state_size,256)
         self.fc_pi = nn.Linear(256,3)
         self.fc_v  = nn.Linear(256,1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
@@ -109,7 +109,7 @@ class Agent(object):
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
         self.steps = 0
-        self.model = PPO()
+        self.model = PPO(state_space_size)
         score = 0.0
         self.print_interval = 20
         self.target_update_freq = target_update_freq

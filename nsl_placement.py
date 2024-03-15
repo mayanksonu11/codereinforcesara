@@ -31,9 +31,9 @@ def delay_node(percent_util):# to change the function
     return delay # output in ms
 
 def nsl_placement(nslr, substrate, node_to_nslr):
+    # initialization of variables
     global ranked_nodes_cpu
     curr_id = nslr.id
-    copy_node_to_nslr = node_to_nslr
     profit_nodes = 0
     profit_links = 0
     centralized_vnfs = []
@@ -42,78 +42,72 @@ def nsl_placement(nslr, substrate, node_to_nslr):
     delay = 0    
     current_delay = 0
     delta_delay = 0 
-    vnfs = nslr.nsl_graph["vnfs"] #considerar rankear vnfs tambien
-    reduce_nslr_graph(nslr) #builds a reduced version of the nsl_graph
+    
+    #builds a reduced version of the nsl_graph 
+    reduce_nslr_graph(nslr) 
     vnodes = nslr.nsl_graph_reduced["vnodes"]    
-    # print("*vnodes",vnodes)
+    # assert(nsl_graph_red == nslr.nsl_graph_reduced)
+    # other required parameters like node_list, ranked_nodes,
     calculate_resource_potential(substrate,"cpu")
-    nodes = copy.deepcopy(substrate.graph["nodes"]) #copia para trabajar temporalmente con ella
-    ranked_nodes_cpu = sort_nodes(nodes,"node_potential") #ranked list of nodes by potential considering cpu and conections     
-    # ranked_nodes_cpu = nodes
+    nodes = copy.deepcopy(substrate.graph["nodes"]) # copy to temporarily work with
+    ranked_nodes_cpu = sort_nodes(nodes,"node_potential") #ranked list of nodes by potential considering cpu and conections
+
+    # Flags
     rejected = False
-    flag = False # para saber si un vnode no ha sido mapeado en nodos del mismo tipo
+    flag = False # to know if a vnode has not been mapped to nodes of the same type
+    iter_rejected = False
     ################### vnfs admission #################
-    rejected = False
     already = [] #list of nodes that already hold a vnode
-    already_vnf = dict()
-    do_nothing = 0
-    total_cpu = 0
+    already_vnf = dict() # list of VNF already places with it's current delay
+
     for v in vnodes:
         if rejected:
             break
         for n in ranked_nodes_cpu:  
-            #si recurso suficiente y nodo del mismo tipo y nodo no utilizado, vnode accepted  
-            if v["type"] == 0:
-                tipo = "centralized_cpu"
-                percent_utilization= 1-((n["cpu"]-v["cpu"])/300)
-                current_delay=delay_node(1-n["cpu"]/300)
-            else:
-                tipo = "edge_cpu"
-                percent_utilization=1-((n["cpu"]-v["cpu"])/100)
-                current_delay=delay_node(1-n["cpu"]/100)
+            iter_rejected = False
+            #if sufficient resource and node of the same type and unused node, vnode accepted  
+            current_delay  = delay_node(1-n["cpu"]/n["init_cpu"])
+            next_percent_utilization= 1-((n["cpu"]-v["cpu"])/n["init_cpu"])
+            expected_delay = delay_node(next_percent_utilization)
+            delta_delay = expected_delay - current_delay
 
-            delta_delay = delay_node(percent_utilization) - current_delay
+            if(expected_delay > nslr.delay_budget):
+                rejected = True
+                break
 
             # check if the addition of this delta delay affects other existing users on the node
-            try:
+            if n["id"] in node_to_nslr.keys():
                 for _nslr in node_to_nslr[n["id"]]:
-                    # print("_nslr id:",_nslr.id, "current delay:", _nslr.current_delay) 
                     if(_nslr.current_delay + delta_delay > _nslr.delay_budget):
-                        print("Delay violation of existing users due to percent_util:",percent_utilization, " demand:",v["cpu"])
-                        # print("Updated delay:", _nslr.current_delay + delta_delay, "Delay budget:", _nslr.delay_budget)   
-                        rejected = True
+                        # print("Delay violation of existing users due to percent_util:",percent_utilization, " demand:",v["cpu"])
+                        iter_rejected = True
                         break
-                if rejected:
-                    break
-            except:
-                None
+                if iter_rejected:
+                    continue                
            
-            # update the delay of all the users on the current node in case of successful admission of user
-            try:
-                for _nslr in node_to_nslr[n["id"]]:
-                    _nslr.current_delay += delta_delay
-            except:
-                None
-           
-            # if all vnf cannot be successfully placed then revert the delay of all the users to initial value
+            
+            # find the best VNF with corresponding delay
             _delay = delay
-            if v["function"] not in already_vnf:
-                _delay = _delay + delay_node(percent_utilization) 
-            else:
-                if already_vnf[v["function"]] > delay_node(percent_utilization):
-                    _delay = _delay - already_vnf[v["function"]] + delay_node(percent_utilization)
 
-            # print ("delay:", delay, "delay_budget:", nslr.delay_budget)  
+            # Below code caters to the fact that there could be multiple nodes and we shouldn't add delays of backup nodes as only one of them will be used during service
+            if v["function"] not in already_vnf:
+                _delay = _delay + delay_node(next_percent_utilization) 
+            else:
+                if already_vnf[v["function"]] > delay_node(next_percent_utilization):
+                    _delay = _delay - already_vnf[v["function"]] + delay_node(next_percent_utilization)
+            assert(_delay > 0)
+
             if _delay <= nslr.delay_budget and v["cpu"] <= n["cpu"] and v["type"] == n["type"] and n["id"] not in already: #
                 #mapping:
                 #mapping of user ids to the nodes that they are connected using nodes id are the index
-                total_cpu += v["cpu"]
-                v["mapped_to"] = n["id"]
+                v["mapped_to"] = n["id"] 
                 delay = _delay
+
+                # This code is continuation of previous comment
                 if v["function"] not in already_vnf:
-                    already_vnf[v["function"]] = delay_node(percent_utilization)
+                    already_vnf[v["function"]] = delay_node(next_percent_utilization)
                 else:
-                    already_vnf[v["function"]] = min(delay_node(percent_utilization), already_vnf[v["function"]])
+                    already_vnf[v["function"]] = min(delay_node(next_percent_utilization), already_vnf[v["function"]])
 
                 already.append(n["id"])
                 break
@@ -122,25 +116,24 @@ def nsl_placement(nslr, substrate, node_to_nslr):
                     rejected = True    
                     break   
     ################### ------------- #################                
-    
+    if(len(already) != len(vnodes)):
+        rejected = True
     ################## vlinks admission #################
+                
     if not rejected:
+        # print(nslr.nsl_graph_reduced)
         rejected = analyze_links_dijkstra(nslr.nsl_graph_reduced,substrate)
     
     if not rejected:
         assert(delay > 0)
         nslr.current_delay = delay
         nslr.set_nsl_graph_reduced(nslr.nsl_graph_reduced)
-        # print("Successfully accepted:",nslr.service_type," cpu:",total_cpu, " delay:", delay)
-    else:
-        node_to_nslr = copy_node_to_nslr
-        assert(node_to_nslr == copy_node_to_nslr)
-    # else:
-    #     print("\n\n","***rejected by scarce node rsc","\n\n")
-    ################### ------------- #################
-    # if rejected:
-    #     print("\n\n","***rejected by scarce link rsc","\n\n")
-    #print("Mapping of node to nslr",node_to_nslr)
+        # update the delay of all the users on the current node in case of successful admission of user
+        for node in already:
+            if node in node_to_nslr.keys():
+                for _nslr in node_to_nslr[node]:
+                    _nslr.current_delay += delta_delay
+
     assert(curr_id == nslr.id)
     return rejected, delay 
 
