@@ -35,6 +35,8 @@ def plot_param_multi_rep(param, repitition, episode, name=""):
     # print("Current Time =", current_time)
     ep_avg_list = []
     for ep in range(episode):
+        # if ep < episode - 50:
+        #     continue
         ep_param = param[ep]
         ep_avg_list.append(sum(ep_param)/len(ep_param))
         plt.plot(ep_param)
@@ -48,6 +50,7 @@ def plot_var(var_name):
     now = datetime.now()
     current_time = now.strftime("%d-%m-%Y-%H:%M:%S")
     # print("Var:",var_name)
+    plt.ylim(0,max(var_name))
     plt.plot(var_name)
     plt.savefig("./plots/plots_"+ str(current_time) +".png")
     plt.show()

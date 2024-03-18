@@ -31,7 +31,7 @@ twindow_length = 1
 embb_arrival_rate = 0
 urllc_arrival_rate = 0
 miot_arrival_rate = 0 
-arrival_rates = [100] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
+arrival_rates = [50] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
 rewards = []
 mean_operation_time = 15
 
@@ -368,20 +368,22 @@ def prioritizer(window_req_list,action): #v2
     granted_req_list = []
     remaining_req_list = []
     
+    factor = 1.0 # this value 10 in multiplied in mu_net
+
     #action = (0.75,1,0.25) -> (cant1,cant2,cant3) 
     #traducir action en porcentage a cantidades (entero más cercano)
-    # action2.append([action[0],round(action[0]*len(window_req_list[0])),0]) #[pctg,cant,tipo] ej:[0.75,75,0]
-    # action2.append([action[1],round(action[1]*len(window_req_list[1])),1])
-    # action2.append([action[2],round(action[2]*len(window_req_list[2])),2])
+    action2.append([action[0],round(action[0]*len(window_req_list[0])),0,2]) #[pctg,cant,tipo] ej:[0.75,75,0]
+    action2.append([action[1],round(action[1]*len(window_req_list[1])),1,3])
+    action2.append([action[2],round(action[2]*len(window_req_list[2])),2,1])
 
     #for fixed priority
-    action2.append([2,round(action[0]*len(window_req_list[0])),0]) #[pctg,cant,tipo] ej:[0.75,75,0]
-    action2.append([3,round(action[1]*len(window_req_list[1])),1])
-    action2.append([1,round(action[2]*len(window_req_list[2])),2])
+    # action2.append([2,round(action[0]*factor*len(window_req_list[0])),0]) #[pctg,cant,tipo] ej:[0.75,75,0]
+    # action2.append([3,round(action[1]*factor*len(window_req_list[1])),1])
+    # action2.append([1,round(action[2]*factor*len(window_req_list[2])),2])
 
     #de acuerdo a "action", ordenar "action2"
-    action2.sort(key=takeFirst,reverse=True)
-    print("Action2:",action2)
+    action2.sort(key=lambda key: key[3],reverse=True)
+    # print("Action2:",action2)
     for j in action2:
         
         if j[0]>=1:
@@ -392,7 +394,8 @@ def prioritizer(window_req_list,action): #v2
                 if i < j[1]:
                     granted_req_list.append(window_req_list[j[2]][i])
                 else:
-                    remaining_req_list.append(window_req_list[j[2]][i])      
+                    remaining_req_list.append(window_req_list[j[2]][i])   
+    # print("Granted_List",granted_req_list)
     return granted_req_list, remaining_req_list #v6
     #return granted_req_list+remaining_req_list, remaining_req_list #v1
 
@@ -484,10 +487,11 @@ def resource_allocation(cn): #cn=controller
     step_accept_count_embb = 0
     step_accept_count_miot = 0
 
+    rejection_count = 0
     rejection_count_urllc = 0
     rejection_count_embb = 0
     rejection_count_miot = 0
-    rejection_penalty = 1
+    rejection_penalty = 2
     voilations=0
     global node_to_nslr
 
@@ -530,6 +534,7 @@ def resource_allocation(cn): #cn=controller
             profit_nodes = calculate_metrics.calculate_profit_nodes(req,end_simulation_time)
             profit_links = calculate_metrics.calculate_profit_links(req,end_simulation_time)*10    
             step_profit += (profit_nodes + profit_links)/max_profit #the total profit in this step is the reward
+            # step_profit += (profit_nodes + profit_links) #the total profit in this step is the reward
             step_link_profit += profit_links/max_link_profit
             step_node_profit += profit_nodes/max_node_profit
             # if step_penalty==1000:
@@ -567,6 +572,7 @@ def resource_allocation(cn): #cn=controller
             #step_total_utl += (a+b+(c*10))/((edge_initial+centralized_initial+bw_initial)*end_simulation_time)
             step_total_utl += (step_node_utl + step_links_bw_utl)/2
         else:
+            rejection_count += 1
             if req.service_type == "urllc":
                 rejection_count_urllc += 10
             elif req.service_type == "embb":
@@ -574,13 +580,12 @@ def resource_allocation(cn): #cn=controller
             else:
                 rejection_count_miot += 1
     #print("accepted requests",sim.accepted_reqs,"\n") 
-    rejection_count = rejection_count_urllc + rejection_count_embb + rejection_count_miot 
     step_penalty += rejection_count*rejection_penalty
-    step_accept = step_accept_count_urllc*10 + step_accept_count_embb*5 + step_accept_count_miot
-    step_accept = 0
+    step_accept = step_accept_count_urllc + step_accept_count_embb + step_accept_count_miot
+    # step_accept = 0
     # step_profit -= step_penalty # Let's keep penalty and reward seperate
     # step_penalty = 0
-    return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_count_embb,step_accept_count_urllc,step_accept_count_miot
+    return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_count_embb,step_accept_count_urllc,step_accept_count_miot,rejection_count
 
 def get_code(value): 
     cod = 0
@@ -619,7 +624,7 @@ def get_code(value):
         cod = 8
     else:
         cod = 9
-    return cod
+    return cod*0.1
     
     #return value
 
@@ -963,8 +968,10 @@ def func_twindow(c,evt):
     
 
     sim.granted_req_list, remaining_req_list = prioritizer(sim.window_req_list, a) #se filtra la lista de reqs dependiendo de la accion
+    if len(sim.granted_req_list) == 0:
+        return
     #la lista se envia al modulo de Resource Allocation
-    step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_embb,step_accept_urllc,step_accept_miot = resource_allocation(c)
+    step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_embb,step_accept_urllc,step_accept_miot, step_rejection_count = resource_allocation(c)
     c.total_profit += step_profit
     c.node_profit += step_node_profit
     c.link_profit += step_link_profit
@@ -979,7 +986,16 @@ def func_twindow(c,evt):
     c.total_voilations += voilations
     c.penalty += step_penalty
     
-    r = step_accept
+
+    # r = step_profit
+    # r = 0
+    # if step_penalty > 0:
+    #     r = step_accept/step_penalty
+    # else:
+    #     r = 10000
+    r = (step_accept)/(step_accept+step_rejection_count)
+    # r = (step_rejection_count)/(step_accept+step_rejection_count)
+    # r = (step_accept-step_rejection_count)/(step_accept+step_rejection_count)
     rewards.append(r)
     next_state = get_state_new(c.substrate,c.simulation) #getting the next state    
     
@@ -1153,11 +1169,25 @@ def main():
                 acpt_user_embb_rep[j].append(controller.simulation.embb_accepted_reqs)
                 acpt_user_urllc_rep[j].append(controller.simulation.urllc_accepted_reqs)
                 acpt_user_miot_rep[j].append(controller.simulation.miot_accepted_reqs)
-                        
-                acpt_rate_rep[j].append(controller.simulation.accepted_reqs/controller.simulation.attended_reqs)
-                acpt_rate_embb_rep[j].append(controller.simulation.embb_accepted_reqs/controller.simulation.granted_embb_reqs)
-                acpt_rate_urllc_rep[j].append(controller.simulation.urllc_accepted_reqs/controller.simulation.granted_urllc_reqs)
-                acpt_rate_miot_rep[j].append(controller.simulation.miot_accepted_reqs/controller.simulation.granted_miot_reqs)
+
+                if controller.simulation.attended_reqs > 0:
+                    acpt_rate_rep[j].append(controller.simulation.accepted_reqs/controller.simulation.attended_reqs)
+                else:
+                    acpt_rate_rep[j].append(0)
+
+                if controller.simulation.granted_embb_reqs > 0:
+                    acpt_rate_embb_rep[j].append(controller.simulation.embb_accepted_reqs/controller.simulation.granted_embb_reqs)
+                else:
+                    acpt_rate_embb_rep[j].append(0)
+
+                if controller.simulation.granted_urllc_reqs > 0:
+                    acpt_rate_urllc_rep[j].append(controller.simulation.urllc_accepted_reqs/controller.simulation.granted_urllc_reqs)
+                else:
+                    acpt_rate_urllc_rep[j].append(0)
+                if controller.simulation.granted_miot_reqs > 0:
+                    acpt_rate_miot_rep[j].append(controller.simulation.miot_accepted_reqs/controller.simulation.granted_miot_reqs)
+                else:
+                    acpt_rate_miot_rep[j].append(0)
 
                 tot_acpt_rate_rep[j].append(controller.simulation.accepted_reqs/controller.simulation.total_reqs)
                 tot_acpt_rate_embb_rep[j].append(controller.simulation.embb_accepted_reqs/controller.simulation.total_embb_reqs)
@@ -1185,11 +1215,7 @@ def main():
 
             f.write("Total Repetitions: "+str(repetitions)+" Episodes:" + str(episodes) + "\n")
             f.write("Repetition: "+str(i)+"\n")
-            f.write(plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_embb_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_urllc_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_miot_rep,repetitions,episodes))
+            # f.write(plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
@@ -1198,6 +1224,10 @@ def main():
             f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_embb_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_urllc_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_miot_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_user_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_user_embb_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_user_urllc_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(acpt_user_miot_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
             f.write(plot_param.plot_param_multi_rep(penalty,repetitions,episodes))

@@ -18,7 +18,8 @@ def calculate_profit_nodes(nslr,end_simulation_time):
         # else:
         #     cf_cpu = 4 
         cost += vnf["cpu"]*cf_cpu
-        revenue += vnf["cpu"]*cf_cpu + price_charged #revenue es el doble del costo (hasta ahora) 
+        # revenue += vnf["cpu"]*cf_cpu #revenue es el doble del costo (hasta ahora) 
+    revenue = cost*2
 
     if nslr.end_time > end_simulation_time:
         #si es mayor, se considera la porcion de tiempo hasta acabar la simulacion  

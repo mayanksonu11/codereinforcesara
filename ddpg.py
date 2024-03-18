@@ -39,10 +39,12 @@ class MuNet(nn.Module):
         self.fc_mu = nn.Linear(64, action_space_size)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc_mu(x))
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
+        x = F.leaky_relu(self.fc_mu(x))
+        print("MU pre_activation:",x)
         mu = F.sigmoid(x) # Multipled by 2 because the action space of the Pendulum-v0 is [-2,2]
+        # mu = torch.mul(mu,10) # constant
         # print(mu)
         return mu
 
@@ -60,11 +62,12 @@ class QNet(nn.Module):
         cat = torch.cat((h1,h2), dim=0)
         q = F.relu(self.fc_q(cat))
         q = self.fc_out(q)
+        q = F.selu(q)
         return q
 
 class OrnsteinUhlenbeckNoise:
     def __init__(self, mu):
-        self.theta, self.dt, self.sigma = 0.1, 0.01, 0.1
+        self.theta, self.dt, self.sigma = 0.15, 0.01, 0.3
         self.mu = mu
         self.x_prev = np.zeros_like(self.mu)
 
@@ -106,12 +109,12 @@ class Agent(object):
                 action_space_size,
                 target_update_freq=50, #1000, #cada n steps se actualiza la target network
                 discount=0.99,
-                batch_size=80,
+                batch_size=32,
                 max_explore=1,
                 min_explore=0.05,
                 anneal_rate=(1/5000), #100000),
                 replay_memory_size=100000,
-                replay_start_size= 100): #500): #10000): #despues de n steps comienza el replay
+                replay_start_size= 40): #500): #10000): #despues de n steps comienza el replay
         """Set parameters, initialize network."""
         self.action_space_size = action_space_size
 
@@ -172,7 +175,6 @@ class Agent(object):
                 self.memory.put(experience)
 
             if self.steps % self.replay_start_size == 0: #para acumular cierta cantidad de experiences antes de comenzar el entrenamiento
-                for i in range(10):
                     self.train(self.mu, self.mu_target, self.q, self.q_target, self.memory, self.q_optimizer, self.mu_optimizer)
                     self.soft_update(self.mu, self.mu_target)
                     self.soft_update(self.q,  self.q_target)
@@ -187,8 +189,8 @@ class Agent(object):
         """Epsilon-greedy policy for training, greedy policy otherwise."""
         state = np.array(state)
         action =  self.mu(torch.from_numpy(state).float()) 
-        for i in range(len(action)):
-            action[i] = max(0, action[i] + self.ou_noise()[i])
+        # for i in range(len(action)):
+        #     action[i] = max(0, action[i] + self.ou_noise()[i])
 
         return action
 
@@ -209,7 +211,9 @@ class Agent(object):
             s_prime = torch.tensor(next_inputs[i])
 
             target = r + gamma * q_target(s_prime, mu_target(s_prime))
+            print("Q value:",q(s,a),"target:",target.detach())
             q_loss = F.smooth_l1_loss(q(s,a), target.detach())
+            print("Loss value:",q_loss)
             q_optimizer.zero_grad()
             q_loss.backward()
             q_optimizer.step()
