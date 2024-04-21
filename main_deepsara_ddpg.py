@@ -15,12 +15,12 @@ from datetime import datetime
 import plot_param
 import ppo
 import dqn
-# import dql
+import dql
 
 # import bisect
 #simulation parameters
 # seed = 0
-repetitions = 1 #33
+repetitions = 5 #33
 #RL-specific parameters
 episodes = 100 #240
 twindow_length = 1
@@ -31,7 +31,7 @@ twindow_length = 1
 embb_arrival_rate = 0
 urllc_arrival_rate = 0
 miot_arrival_rate = 0 
-arrival_rates = [50] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
+arrival_rates = [90] #[100,80,60,40,30,25,20,15,10,7,5,3,1] #20
 rewards = []
 mean_operation_time = 15
 
@@ -418,7 +418,7 @@ def update_resources(substrate,nslr,kill):
             if kill: #if it is kill process, resources are free again
                 
                 n["cpu"] = n["cpu"] + vnf["cpu"]
-                assert(n["cpu"] <= n["init_cpu"])
+                # assert(n["cpu"] <= n["init_cpu"])
                 #print("Before size of array",len(node_to_nslr[n["id"]]))
                 node_to_nslr[n["id"]].discard(nslr)
                 #print("After size of array",len(node_to_nslr[n["id"]]))
@@ -441,7 +441,7 @@ def update_resources(substrate,nslr,kill):
                 l = next(l for l in links if ( (l["source"]==path[i] and l["target"]==path[i+1]) or (l["source"]==path[i+1] and l["target"]==path[i]) ) )              
                 if kill:
                     l["bw"] += vlink["bw"]
-                    assert(l["bw"] <= l["init_bw"])
+                    # assert(l["bw"] <= l["init_bw"])
                     substrate.graph["bw"] += vlink["bw"]
                 else:
                     l["bw"] -= vlink["bw"]
@@ -491,7 +491,7 @@ def resource_allocation(cn): #cn=controller
     rejection_count_urllc = 0
     rejection_count_embb = 0
     rejection_count_miot = 0
-    rejection_penalty = 2
+    rejection_penalty = 0
     voilations=0
     global node_to_nslr
 
@@ -574,9 +574,9 @@ def resource_allocation(cn): #cn=controller
         else:
             rejection_count += 1
             if req.service_type == "urllc":
-                rejection_count_urllc += 10
+                rejection_count_urllc += 1
             elif req.service_type == "embb":
-                rejection_count_embb += 5
+                rejection_count_embb += 1
             else:
                 rejection_count_miot += 1
     #print("accepted requests",sim.accepted_reqs,"\n") 
@@ -993,7 +993,7 @@ def func_twindow(c,evt):
     #     r = step_accept/step_penalty
     # else:
     #     r = 10000
-    r = (step_accept)/(step_accept+step_rejection_count)
+    r = (step_accept-step_rejection_count)/(step_accept+step_rejection_count)
     # r = (step_rejection_count)/(step_accept+step_rejection_count)
     # r = (step_accept-step_rejection_count)/(step_accept+step_rejection_count)
     rewards.append(r)
@@ -1133,8 +1133,8 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agent_name = "ddpg"
-            agente = ddpg.Agent(47,n_actions) # creating a ddpg agent
+            agent_name = "dql"
+            agente = dql.Agent(47,n_actions) # creating a DRL agent
             
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
@@ -1173,21 +1173,21 @@ def main():
                 if controller.simulation.attended_reqs > 0:
                     acpt_rate_rep[j].append(controller.simulation.accepted_reqs/controller.simulation.attended_reqs)
                 else:
-                    acpt_rate_rep[j].append(0)
+                    acpt_rate_rep[j].append(1)
 
                 if controller.simulation.granted_embb_reqs > 0:
                     acpt_rate_embb_rep[j].append(controller.simulation.embb_accepted_reqs/controller.simulation.granted_embb_reqs)
                 else:
-                    acpt_rate_embb_rep[j].append(0)
+                    acpt_rate_embb_rep[j].append(1)
 
                 if controller.simulation.granted_urllc_reqs > 0:
                     acpt_rate_urllc_rep[j].append(controller.simulation.urllc_accepted_reqs/controller.simulation.granted_urllc_reqs)
                 else:
-                    acpt_rate_urllc_rep[j].append(0)
+                    acpt_rate_urllc_rep[j].append(1)
                 if controller.simulation.granted_miot_reqs > 0:
                     acpt_rate_miot_rep[j].append(controller.simulation.miot_accepted_reqs/controller.simulation.granted_miot_reqs)
                 else:
-                    acpt_rate_miot_rep[j].append(0)
+                    acpt_rate_miot_rep[j].append(1)
 
                 tot_acpt_rate_rep[j].append(controller.simulation.accepted_reqs/controller.simulation.total_reqs)
                 tot_acpt_rate_embb_rep[j].append(controller.simulation.embb_accepted_reqs/controller.simulation.total_embb_reqs)
@@ -1216,129 +1216,131 @@ def main():
             f.write("Total Repetitions: "+str(repetitions)+" Episodes:" + str(episodes) + "\n")
             f.write("Repetition: "+str(i)+"\n")
             # f.write(plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_embb_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_urllc_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(tot_acpt_rate_miot_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_embb_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_urllc_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(acpt_user_miot_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
-            f.write(plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_rate_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_rate_embb_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_rate_urllc_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_rate_miot_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(tot_acpt_rate_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(tot_acpt_rate_embb_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(tot_acpt_rate_urllc_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(tot_acpt_rate_miot_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_user_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_user_embb_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_user_urllc_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(acpt_user_miot_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(node_utl_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(link_utl_rep,repetitions,episodes))
+            f.write(plot_param.calculate_average(penalty,repetitions,episodes))
             f.write("**Reward:\n")
             f.write(str(total_profit_rep)+"\n")
-            f.write("Average:" + plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
+            f.write("Average:" + plot_param.calculate_average(total_profit_rep,repetitions,episodes))
             f.write("**Acceptance Rate:\n")
             f.write(str(acpt_rate_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_rep,repetitions,episodes))
             f.write("**acpt_rate_embb_rep:\n")
             f.write(str(acpt_rate_embb_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_embb_rep,repetitions,episodes))
             f.write("**acpt_rate_urllc_rep:\n")
             f.write(str(acpt_rate_urllc_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_urllc_rep,repetitions,episodes))
             f.write("**acpt_rate_miot_rep:\n")
             f.write(str(acpt_rate_miot_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_miot_rep,repetitions,episodes))
             f.write("**node_utl_rep:\n")
             f.write(str(node_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(node_utl_rep,repetitions,episodes))
             f.write("**link_utl_rep:\n")
             f.write(str(link_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(link_utl_rep,repetitions,episodes))
             f.write("**Penalty:\n")
             f.write(str(penalty)+"\n")        
-            f.write("Average:"+plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(penalty,repetitions,episodes))
 
             f.write("**node_profit_rep:\n")
             f.write(str(node_profit_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(node_profit_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(node_profit_rep,repetitions,episodes))
             f.write("**link_profit_rep:\n")
             f.write(str(link_profit_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(link_profit_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(link_profit_rep,repetitions,episodes))
             f.write("**edge_profit_rep:\n")
             f.write(str(edge_profit_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(edge_profit_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(edge_profit_rep,repetitions,episodes))
             f.write("**central_profit_rep:\n")
             f.write(str(central_profit_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(central_profit_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(central_profit_rep,repetitions,episodes))
             f.write("**profit_embb_rep:\n")
             f.write(str(profit_embb_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(profit_embb_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(profit_embb_rep,repetitions,episodes))
             f.write("**profit_urllc_rep:\n")
             f.write(str(profit_urllc_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(profit_urllc_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(profit_urllc_rep,repetitions,episodes))
             f.write("**profit_miot_rep:\n")
             f.write(str(profit_miot_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(profit_miot_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(profit_miot_rep,repetitions,episodes))
 
             f.write("**Acceptance Rate:\n")
             f.write(str(acpt_rate_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_rep,repetitions,episodes))
             f.write("**acpt_rate_embb_rep:\n")
             f.write(str(acpt_rate_embb_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_embb_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_embb_rep,repetitions,episodes))
             f.write("**acpt_rate_urllc_rep:\n")
             f.write(str(acpt_rate_urllc_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_urllc_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_urllc_rep,repetitions,episodes))
             f.write("**acpt_rate_miot_rep:\n")
             f.write(str(acpt_rate_miot_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(acpt_rate_miot_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(acpt_rate_miot_rep,repetitions,episodes))
 
             f.write("**Acceptance Rate:\n")
             f.write(str(tot_acpt_rate_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(tot_acpt_rate_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(tot_acpt_rate_rep,repetitions,episodes))
             f.write("**acpt_rate_embb_rep:\n")
             f.write(str(tot_acpt_rate_embb_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(tot_acpt_rate_embb_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(tot_acpt_rate_embb_rep,repetitions,episodes))
             f.write("**acpt_rate_urllc_rep:\n")
             f.write(str(tot_acpt_rate_urllc_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(tot_acpt_rate_urllc_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(tot_acpt_rate_urllc_rep,repetitions,episodes))
             f.write("**acpt_rate_miot_rep:\n")
             f.write(str(tot_acpt_rate_miot_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(tot_acpt_rate_miot_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(tot_acpt_rate_miot_rep,repetitions,episodes))
 
             f.write("**total_utl_rep:\n")
             f.write(str(total_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(total_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(total_utl_rep,repetitions,episodes))
             f.write("**node_utl_rep:\n")
             f.write(str(node_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(node_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(node_utl_rep,repetitions,episodes))
             f.write("**link_utl_rep:\n")
             f.write(str(link_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(link_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(link_utl_rep,repetitions,episodes))
             f.write("**edge_ult_rep:\n")
             f.write(str(edge_ult_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(edge_ult_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(edge_ult_rep,repetitions,episodes))
             f.write("**central_utl_rep:\n")
             f.write(str(central_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(central_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(central_utl_rep,repetitions,episodes))
             f.write("**embb_utl_rep:\n")
             f.write(str(embb_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(embb_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(embb_utl_rep,repetitions,episodes))
             f.write("**urllc_utl_rep:\n")
             f.write(str(urllc_utl_rep)+"\n")
-            f.write("Average:"+plot_param.plot_param_multi_rep(urllc_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(urllc_utl_rep,repetitions,episodes))
             f.write("**miot_utl_rep:\n")
             f.write(str(miot_utl_rep)+"\n") 
-            f.write("Average:"+plot_param.plot_param_multi_rep(miot_utl_rep,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(miot_utl_rep,repetitions,episodes))
             f.write("**voilations:\n")
             f.write(str(voilations)+"\n")  
-            f.write("Average:"+plot_param.plot_param_multi_rep(voilations,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(voilations,repetitions,episodes))
             f.write("**Penalty:\n")
             f.write(str(penalty)+"\n")        
-            f.write("Average:"+plot_param.plot_param_multi_rep(penalty,repetitions,episodes))
+            f.write("Average:"+plot_param.calculate_average(penalty,repetitions,episodes))
             f.close()
             # print("Total reqs:",controller.simulation.total_reqs,"Total embb reqs:",controller.simulation.total_embb_reqs,"Total URLLC reqs:",controller.simulation.total_urllc_reqs)
             agente.save()
-        print("Node_utl:",plot_param.plot_param_multi_rep(node_utl_rep, repetitions, episodes, name=agent_name))
-        print("Link_utl:",plot_param.plot_param_multi_rep(link_utl_rep, repetitions, episodes, name=agent_name))
+        print("Node_utl:",plot_param.calculate_average(node_utl_rep, repetitions, episodes))
+        print("Link_utl:",plot_param.calculate_average(link_utl_rep, repetitions, episodes))
+        plot_param.plot_param_multi_rep(acpt_rate_rep, repetitions, episodes, "Acceptance Rate")
+        plot_param.plot_param_multi_rep(tot_acpt_rate_rep, repetitions, episodes, "Total Acceptance Rate")
         plot_param.plot_var(rewards)
 
 if __name__ == '__main__':

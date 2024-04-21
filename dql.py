@@ -4,6 +4,17 @@ import tensorflow as tf
 import collections as cns
 
 
+action_list = [
+(1,1,1),
+(0.75,1,1),(1,0.75,1),(1,1,0.75),(1,0.75,0.75),(0.75,1,0.75),
+(0.75,1,0.5),(0.5,1,0.75),(1,0.75,0.5),
+(0.5,1,1),(1,1,0.5),(1,0.5,1),(0.5,1,0.5),(1,0.5,0.5),
+(0.25,1,1),(1,1,0.25),(0.25,1,0.25),(0.1,1,1),(1,1,0.1),(0.1,1,0.1),
+(0.25,1,0.1), (0.1,1,0.25), (0.5,1,0.1), (0.1,1,0.5), (0.75,1,0.1), (0.1,1,0.75),
+(0.25,1,0.5), (0.5,1,0.25), (0.25,1,0.75), (0.75,1,0.25)  
+]
+
+
 def dense(x, weights, bias, activation=tf.identity, **activation_kwargs):
     """Dense layer."""
     #x = x.astype("float32")
@@ -186,7 +197,7 @@ class Agent(object):
         self.last_state = state
         self.last_action = action
 
-        return action
+        return action_list[action]
 
     def policy(self, state, training):
         """Epsilon-greedy policy for training, greedy policy otherwise."""
