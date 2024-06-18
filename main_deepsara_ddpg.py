@@ -123,6 +123,7 @@ class Controlador:
     def __init__(self):
         #metricas
         self.total_profit = 0
+        self.total_tput = 0
         self.node_profit=0
         self.link_profit=0
         self.embb_profit = 0
@@ -467,6 +468,7 @@ def resource_allocation(cn): #cn=controller
     step_edge_profit = 0
     step_central_profit = 0
     step_profit=0
+    step_tput = 0
     step_edge_cpu_utl = 0
     step_central_cpu_utl = 0
     step_links_bw_utl = 0
@@ -534,6 +536,7 @@ def resource_allocation(cn): #cn=controller
             profit_nodes = calculate_metrics.calculate_profit_nodes(req,end_simulation_time)
             profit_links = calculate_metrics.calculate_profit_links(req,end_simulation_time)*10    
             step_profit += (profit_nodes + profit_links)/max_profit #the total profit in this step is the reward
+            step_tput += req.rate_demand
             # step_profit += (profit_nodes + profit_links) #the total profit in this step is the reward
             step_link_profit += profit_links/max_link_profit
             step_node_profit += profit_nodes/max_node_profit
@@ -585,7 +588,7 @@ def resource_allocation(cn): #cn=controller
     # step_accept = 0
     # step_profit -= step_penalty # Let's keep penalty and reward seperate
     # step_penalty = 0
-    return step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_count_embb,step_accept_count_urllc,step_accept_count_miot,rejection_count
+    return step_profit,step_tput,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_count_embb,step_accept_count_urllc,step_accept_count_miot,rejection_count
 
 def get_code(value): 
     cod = 0
@@ -971,8 +974,9 @@ def func_twindow(c,evt):
     if len(sim.granted_req_list) == 0:
         return
     #la lista se envia al modulo de Resource Allocation
-    step_profit,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_embb,step_accept_urllc,step_accept_miot, step_rejection_count = resource_allocation(c)
+    step_profit,step_tput,step_node_profit,step_link_profit,step_embb_profit,step_urllc_profit,step_miot_profit,step_total_utl,step_node_utl,step_links_bw_utl,step_edge_cpu_utl,step_central_cpu_utl,voilations,step_penalty,step_accept,step_accept_embb,step_accept_urllc,step_accept_miot, step_rejection_count = resource_allocation(c)
     c.total_profit += step_profit
+    c.total_tput += step_tput
     c.node_profit += step_node_profit
     c.link_profit += step_link_profit
     c.embb_profit += step_embb_profit
@@ -1059,6 +1063,7 @@ def main():
         miot_arrival_rate = 5*m/8        
         
         total_profit_rep = []
+        total_tput_rep = []
         link_profit_rep = []
         node_profit_rep = []
         edge_profit_rep = []
@@ -1095,6 +1100,7 @@ def main():
         
         for i in range(episodes):
             total_profit_rep.append([])
+            total_tput_rep.append([])
             link_profit_rep.append([])
             node_profit_rep.append([])
             edge_profit_rep.append([])
@@ -1133,8 +1139,8 @@ def main():
         current_time = now.strftime("%d-%m:%H:%M:%S")
         
         for i in range(repetitions):
-            agent_name = "dql"
-            agente = dql.Agent(47,n_actions) # creating a DRL agent
+            agent_name = "ddpg"
+            agente = ddpg.Agent(47,n_actions) # creating a DRL agent
             
             #agente = ql.Qagent(0.9, 0.9, 0.9, episodes, n_states, n_actions) #(alpha, gamma, epsilon, episodes, n_states, n_actions)
            
@@ -1157,6 +1163,7 @@ def main():
                 # print(controller.simulation.current_instatiated_reqs[0], controller.simulation.current_instatiated_reqs[1], controller.simulation.current_instatiated_reqs[2])    
 
                 total_profit_rep[j].append(controller.total_profit)
+                total_tput_rep[j].append(controller.total_tput)
                 node_profit_rep[j].append(controller.node_profit)        
                 link_profit_rep[j].append(controller.link_profit)
                 edge_profit_rep[j].append(controller.edge_profit)
@@ -1211,11 +1218,12 @@ def main():
 
             #bot.sendMessage("Repetition " + str(i) + " finishes!")
 
-            f = open("./results/" + current_time + "deepsara_"+str(m)+"delay_trial_"+ agent_name + ".txt","w+")
+            f = open("./results/" + agent_name + "_" + current_time + "deepsara_"+str(m)+"delay_trial.txt","w+")
 
             f.write("Total Repetitions: "+str(repetitions)+" Episodes:" + str(episodes) + "\n")
             f.write("Repetition: "+str(i)+"\n")
             # f.write(plot_param.plot_param_multi_rep(total_profit_rep,repetitions,episodes))
+            f.write(plot_param.plot_param_multi_rep(total_tput_rep,repetitions,episodes))
             f.write(plot_param.calculate_average(acpt_rate_rep,repetitions,episodes))
             f.write(plot_param.calculate_average(acpt_rate_embb_rep,repetitions,episodes))
             f.write(plot_param.calculate_average(acpt_rate_urllc_rep,repetitions,episodes))
@@ -1234,6 +1242,9 @@ def main():
             f.write("**Reward:\n")
             f.write(str(total_profit_rep)+"\n")
             f.write("Average:" + plot_param.calculate_average(total_profit_rep,repetitions,episodes))
+            f.write("**Throughput:\n")
+            f.write(str(total_tput_rep)+"\n")
+            f.write("Average:" + plot_param.calculate_average(total_tput_rep,repetitions,episodes))
             f.write("**Acceptance Rate:\n")
             f.write(str(acpt_rate_rep)+"\n")
             f.write("Average:"+plot_param.calculate_average(acpt_rate_rep,repetitions,episodes))

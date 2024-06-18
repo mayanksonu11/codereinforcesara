@@ -182,8 +182,8 @@ class Agent(object):
         self.last_state = state
         self.last_action = action
 
-        return action.detach().numpy()
-        # return [1,1,1]
+        # return action.detach().numpy()
+        return [1,1,1]
 
     def policy(self, state, training):
         """Epsilon-greedy policy for training, greedy policy otherwise."""
